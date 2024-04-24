@@ -1,0 +1,1335 @@
+%MATLAB Script to analyze patterns in IFCB Phytoplankton abundances in
+%association wildfire smoke and with other drivers
+
+%Load in the data
+
+%Shore Station
+load('mlm_sst.mat')
+
+%IFCB
+load('ifcb_ucsc_all_mean.mat')
+%Aeronet
+load('monterey_lvl_1.5.mat')
+load('monterey_lvl_2.0.mat')
+ind=Monterey_lvl_1_5.AOD_500nm == -999.0;
+Monterey_lvl_1_5.AOD_500nm(ind)=nan;
+
+%Compute and add anomaly
+Monterey_lvl_1_5.dayOfYear=day(Monterey_lvl_1_5.datetime, 'dayofyear');
+Monterey_lvl_1_5_climatology=climatology(Monterey_lvl_1_5,'AOD_500nm');
+Monterey_lvl_1_5 = join(Monterey_lvl_1_5, Monterey_lvl_1_5_climatology, 'Keys', 'dayOfYear');
+Monterey_lvl_1_5.anomaly=Monterey_lvl_1_5.AOD_500nm-Monterey_lvl_1_5.nanmedian_AOD_500nm;
+
+
+
+%% 
+% writetable(Monterey_lvl_1_5,"C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\SC_aeronet\aeronet_monterey_1.5.csv")
+
+%% Add bray
+
+
+% Extracting only the first 52 columns
+taxa_ifcb_ucsc_all_mean = ifcb_ucsc_all_mean(:, 1:52);
+
+% Calculate Bray-Curtis dissimilarity index for each row
+bray_curtis = calculate_bray_curtis_distance(taxa_ifcb_ucsc_all_mean{:,:});
+
+% Calculate the mean dissimilarity across all pairs of consecutive time points
+mean_dissimilarity = mean(bray_curtis, 'all');
+
+% Create a time vector (example time points)
+% Replace this with your actual time points
+datetime = ifcb_ucsc_all_mean.datetime; 
+
+bray_df=table(datetime, bray_curtis(:,100),'VariableNames',{'datetime','bray_curtis'});
+bray_df.datetime=bray_df.datetime;
+bray_df.dayOfYear=day(bray_df.datetime, 'dayofyear');
+%Calculate climatology
+bray_climatology=climatology(bray_df,'bray_curtis');
+
+
+merged_bray = join(bray_df, bray_climatology, 'Keys', 'dayOfYear');
+merged_bray.anomaly=merged_bray.nanmedian_bray_curtis-merged_bray.bray_curtis;
+
+% figure
+% subplot(2,1,1);
+%     hold on;
+%     plot(time_points,bray_curtis(:,1),'r-')
+%     % Set x-axis ticks and labels
+%         datetick('x')
+%         xticks(date_range);
+%         xticklabels(datestr(date_range, 'mmm, yyyy'));
+%         xtickangle(30);  % Angle the dates for better visibility
+%             xlim([start_date,end_date])
+% 
+%     gcf
+%     subplot(2,1,2)
+%     plot(Monterey_lvl_1_5.Dateddmmyyyy,Monterey_lvl_1_5.AOD_500nm)
+%     % Set x-axis ticks and labels
+%         datetick('x')
+%         xticks(date_range);
+%         xticklabels(datestr(date_range, 'mmm, yyyy'));
+%         xtickangle(30);  % Angle the dates for better visibility
+%             xlim([start_date,end_date])
+% 
+%     set(gcf,'Position',[0 0 1600 700])
+
+
+
+    %% with climatology
+
+colors = lines(8); % Adjust the number based on the range of years
+
+yyaxis left;
+hold on 
+yyaxis right;
+for i=2020:2023
+    plot(bray_df.dayOfYear(bray_df.datetime.Year==i),bray_df.bray_curtis(bray_df.datetime.Year==i,:),'Color',colors(i-2015, :),'LineStyle','-.','LineWidth',2);
+    hold on
+    legend({'2020','2021','2022','2023','climatology'})
+
+end
+gcf
+plotClimatology(bray_df,'bray_curtis')
+
+    set(gcf,'Position',[0 0 1600 700])
+
+    %% Anomalies
+
+    colors = lines(8); % Adjust the number based on the range of years
+    close all
+hold on
+for i=2020:2023
+    subplot(2,1,1)
+    plot(merged_bray.dayOfYear(merged_bray.datetime.Year==i),merged_bray.anomaly(merged_bray.datetime.Year==i),'Color',colors(i-2015, :),'LineStyle','-','LineWidth',2);
+    hold on
+ 
+
+end
+    legend({'2020','2021','2022','2023'})
+line([min(merged_bray.dayOfYear), max(merged_bray.dayOfYear)], [0, 0], 'Color', 'k', 'LineStyle', '--','LineWidth',2);
+
+subplot(2,1,2)
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020),'Color','r','LineStyle','-','LineWidth',2);
+
+    set(gcf,'Position',[0 0 1600 800])
+
+
+%% Plot Postulated groups
+
+start_date=ifcb_ucsc_all_mean.datetime(1);
+end_date=ifcb_ucsc_all_mean.datetime(end);
+date_range = datetime(start_date):calmonths(6):datetime(end_date);
+
+
+figure()
+subplot(3,1,1)
+plot(ifcb_ucsc_all_mean.datetime,ifcb_ucsc_all_mean.Cryptophyte,'.')
+% Set x-axis ticks and labels
+    datetick('x')
+    xticks(date_range);
+    xticklabels(datestr(date_range, 'mmm, yyyy'));
+    xtickangle(30);  % Angle the dates for better visibility
+        xlim([start_date,end_date])
+
+subplot(3,1,2)
+plot(ifcb_ucsc_all_mean.datetime,ifcb_ucsc_all_mean.Centric,'r.')
+% Set x-axis ticks and labels
+    datetick('x')
+    xticks(date_range);
+    xticklabels(datestr(date_range, 'mmm, yyyy'));
+    xtickangle(30);  % Angle the dates for better visibility
+        xlim([start_date,end_date])
+
+subplot(3,1,3)
+plot(Monterey_lvl_1_5.Dateddmmyyyy,Monterey_lvl_1_5.AOD_500nm)
+% Set x-axis ticks and labels
+    datetick('x')
+    xticks(date_range);
+    xticklabels(datestr(date_range, 'mmm, yyyy'));
+    xtickangle(30);  % Angle the dates for better visibility
+        xlim([start_date,end_date])
+
+set(gcf,'Position',[0 0 1600 800])
+
+
+%% Loop through Postulated groups
+
+start_date=ifcb_ucsc_all_mean.datetime(1);
+end_date=ifcb_ucsc_all_mean.datetime(end);
+date_range = start_date:calmonths(6):end_date;
+
+for i=1:10
+    figure(i)
+    subplot(2,1,1);
+    hold on;
+    plot(ifcb_ucsc_all_mean.datetime,ifcb_ucsc_all_mean{:,i},'r.')
+    % Set x-axis ticks and labels
+        datetick('x')
+        xticks(date_range);
+        xticklabels(datestr(date_range, 'mmm, yyyy'));
+        xtickangle(30);  % Angle the dates for better visibility
+            xlim([start_date,end_date])
+    
+    gcf
+    subplot(2,1,2)
+    plot(Monterey_lvl_1_5.Dateddmmyyyy,Monterey_lvl_1_5.AOD_500nm)
+    % Set x-axis ticks and labels
+        datetick('x')
+        xticks(date_range);
+        xticklabels(datestr(date_range, 'mmm, yyyy'));
+        xtickangle(30);  % Angle the dates for better visibility
+            xlim([start_date,end_date])
+    
+    set(gcf,'Position',[0 0 1600 700])
+end
+
+%% AOD
+
+colorz = [
+    0.5451, 0, 0;        % Darker shade of Red
+    0.3333, 0.6588, 0.4078;  % Green
+    0.4, 0.6, 0.8;        % Blue
+    0.7882, 0.4588, 0.9216   % Pastel Purple
+];
+
+yyaxis left;
+plotClimatology(Monterey_lvl_1_5(Monterey_lvl_1_5.datetime.Year ~= 2020,:),'AOD_500nm')
+alpha(0.1)
+ylim([0 0.2])
+hold on 
+yyaxis right;
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2008),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2008),'Color',colorz(1,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2016),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2016),'Color',colorz(2,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2021),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2021),'Color',colorz(4,:),'LineStyle','-','LineWidth',2);
+
+ylabel(['Average AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+
+
+% text
+text(148,1.5,["Indians Fire"+newline+"(Monterey, 2008)"],"Color",'g')
+text(175,3.8,["Soberanes Fire"+newline+"(Monterey, 2016)"],"Color",'b')
+text(200,5,["SCU Lightning Complex Fire"+newline+"(Santa Cruz, 2020)"],"Color",'r')
+legend({'Climatology (2003-present)','2008','2016','2020','2021'})
+set(gcf,'Position',[0 0 1600 600])
+
+saving=0;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\monterey_aod_plot.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\monterey_aod_plot.pdf"]);
+end
+saving=0;
+
+
+
+%% Corss correlation between phytoplankton and AOD
+load('ifcb_bray.mat')
+
+%Add AOD anomaly
+ifcbbray.datetime=ifcbbray.datetime;
+ifcbbray.dayOfYear=day(ifcbbray.datetime, 'dayofyear');
+aod_climatology=climatology(ifcbbray,'AOD_500nm');
+
+
+
+
+% Goal: Plot with taxa on y, time lag on the x and 
+
+% Extract the taxa columns and AOD_500nm column
+taxa_data = table2array(ifcbbray(:, 3:53));
+aod_500nm =ifcbbray.AOD_500nm;
+
+% Initialize variables to store coefficients and lags
+cc= zeros(size(taxa_data, 1)*2-1,size(taxa_data, 2));
+lags = zeros(size(taxa_data, 2), size(taxa_data, 1)*2-1);
+
+taxa=ifcbbray.Properties.VariableNames(3:53);
+
+for i=1:size(taxa_data, 2)
+
+    %Compute climatology and anomaly
+    eval([taxa{i},'_climatology=climatology(ifcbbray,taxa{i})']);
+    eval(['ifcbbray = join(ifcbbray,',taxa{i},'_climatology, ''Keys'', ''dayOfYear'');']);
+    eval(['ifcbbray.',taxa{i},'_anomaly=ifcbbray.',taxa{i},'-ifcbbray.nanmedian_',taxa{i},';'])
+
+    %Cross-correlate
+    eval(['[cc(:,i),lags(i,:)] = xcorr(fillmissing(aod_500nm, ''linear''),ifcbbray.',taxa{i},'_anomaly,''coeff'');'])
+    % Plot the cross-correlation
+    plotting=0;
+    if plotting==1
+    figure(1)
+    % stem(lags, cc);
+    plot(lags(i,:),cc(:,i),'LineStyle','-','LineWidth',2)
+    hold on
+    title("Cross-correlation between AOD 500nm &"+newline+ "Phytoplankton Groups");
+    xlabel('Lags (Days)');
+    ylabel('Normalized Cross-correlation');
+    end
+    % xlim([-30,50])
+end
+ 
+
+%% Select taxa with significant xcorr
+% Set threshold for significant cross-correlation
+threshold = 0.5;
+
+% Initialize arrays to store maximum cross-correlation coefficients and associated lags
+taxa_data=ifcbbray(:,3:53);
+
+
+% Initialize arrays to store maximum cross-correlation coefficients and associated lags
+max_cc = zeros(size(taxa_data, 2), 1);
+max_lag = zeros(size(taxa_data, 2), 1);
+
+% Initialize a list to store significant taxa
+significant_taxa = {};
+
+for i = 1:size(taxa_data, 2)
+    % Find the maximum absolute cross-correlation coefficient and its lag
+    [max_cc(i), idx] = max(abs(cc(:, i)));
+    max_lag(i) = lags(i, idx);
+    
+    % Check if the maximum absolute cross-correlation coefficient is greater than the threshold
+    % and associated lag is less than 50
+    if max_cc(i) > threshold && abs(max_lag(i)) < 50
+        significant_taxa = [significant_taxa, taxa{i}];
+    end
+end
+
+% Display the list of significant taxa
+disp('Significant taxa with cross-correlation coefficient above threshold and associated lags less than 50:');
+disp(significant_taxa);
+
+% Filter the maximum cross-correlation coefficients and associated lags for significant taxa
+significant_max_cc = max_cc(max_cc > threshold & abs(max_lag) < 50);
+significant_max_lag = max_lag(max_cc > threshold & abs(max_lag) < 50);
+
+% Create a table with significant taxa, their maximum cross-correlation coefficients, and associated lags
+significant_results = table(significant_taxa', significant_max_cc, significant_max_lag, ...
+                            'VariableNames', {'Taxa', 'Max_Cross_Corr', 'Associated_Lag'});
+
+% Display the results
+disp('Significant taxa with maximum cross-correlation coefficients and associated lags (|lag| < 50):');
+disp(significant_results);
+
+%% Heatmap of Xcorr of variables 
+
+% Create a heatmap
+
+xmax=50;
+xmin=xmax*-1;
+taxa=ifcbbray.Properties.VariableNames(3:53);
+taxa = strrep(taxa, '_', ' ');
+lag=lags(1,:);
+
+%Plotting 
+XLabels = lag;
+% Convert each number in the array into a string
+CustomXLabels = string(XLabels);
+% Replace all but the fifth elements by spaces
+CustomXLabels(mod(XLabels,xmax/10) ~= 0) = " ";
+% Set the 'XDisplayLabels' property of the heatmap 
+% object 'h' to the custom x-axis tick labels
+
+figure()
+h=heatmap(lag,taxa,cc')
+% heatmap(ifcbbray.Properties.VariableNames(1:51), lag,cc')
+xlim([-xmin,xmax])
+% squeeze(correlationMatrix(:,:,numLags+1))
+colorbar; % Add colorbar to show strength of coefficients
+title('Cross-correlation between Phytoplankton Abundance Anomaly and Aerosol Optical Depth at 500nm');
+xlabel('Lag (days)');
+ylabel('Taxa')
+
+
+colormap('jet')
+xlim([xmin xmax]);
+h.XDisplayLabels = CustomXLabels;
+h.GridVisible = 'off';
+s = struct(h);
+s.XAxis.TickLabelRotation = 45;  % vertical
+set(gcf,'Position',[0 0 1200 1000])
+
+saving=1;
+if saving==1
+    % Save figure as a PNG file in a specific directory
+    directory = 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\xcorr'; % Specify your directory
+    filename = ['xcorr_heatmap_',num2str(xmax),'_lags_anomaly.png']; % Specify the file name
+    fullpath = fullfile(directory, filename); % Create full path
+    saveas(gcf, fullpath); % Save the figure
+end
+
+
+%% Climatologies for selected taxa
+significant_taxa
+
+
+
+for ii=1:length(significant_taxa)
+    figure(1)
+    % Extract day of the year for each datetime entry
+    ifcbbray.dayOfYear = day(ifcbbray.datetime, 'dayofyear');
+
+    % Group by dayOfYear and compute the mean for each group
+    climatology_taxa = varfun(@nanmedian, ifcbbray(ifcbbray.datetime.Year~=2020,:), 'GroupingVariables', 'dayOfYear', 'InputVariables', significant_taxa{ii});
+
+    % Plotting
+    plot(climatology_taxa.dayOfYear, eval(['climatology_taxa.nanmedian_' significant_taxa{ii}]),'Color','#a6a6a6','LineStyle','-','LineWidth',2);
+    hold on
+    xlabel('Day of Year');
+    ylabel(['Median ' replace(significant_taxa{ii}, "_", " ")]);
+    % title('Climatology of Chl A');
+    datetick('x')
+    grid on;
+end
+
+
+
+
+
+
+
+
+%% ======= OTHER DATA ========= %%
+%% HABS Data-get a count per taxa and datetime column
+load('habs_scwharf.mat')
+
+%Species collected include Dinophysis, Alexandrium, Pseudo-nitzschia multiseries, Pseudo-nitzschia australis
+hab_taxa={'Dinophysis_spp','Alexandrium_spp','Pseudo_nitzschia_seriata_group','datetime'};
+habs_taxa=HABs_SantaCruzWharf(:,hab_taxa);
+
+
+%Add anomalies for nitrate and phosphate
+%Compute and add anomaly
+HABs_SantaCruzWharf.weekOfYear=week(HABs_SantaCruzWharf.datetime, 'weekofyear');
+HABs_SantaCruzWharf_climatology=climatology_weekly(HABs_SantaCruzWharf,'Nitrate');
+HABs_SantaCruzWharf = join(HABs_SantaCruzWharf, HABs_SantaCruzWharf_climatology, 'Keys', 'weekOfYear');
+HABs_SantaCruzWharf.anomaly_Nitrate=HABs_SantaCruzWharf.Nitrate-HABs_SantaCruzWharf.nanmedian_Nitrate;
+
+HABs_SantaCruzWharf_climatology=climatology_weekly(HABs_SantaCruzWharf,'Phosphate');
+HABs_SantaCruzWharf = join(HABs_SantaCruzWharf, HABs_SantaCruzWharf_climatology, 'Keys', 'weekOfYear');
+HABs_SantaCruzWharf.anomaly_Phosphate=HABs_SantaCruzWharf.Phosphate-HABs_SantaCruzWharf.nanmedian_Phosphate;
+
+
+%Plotting with AOD
+start_date=habs_taxa.datetime(1);
+end_date=habs_taxa.datetime(end);
+date_range = datetime(start_date):calmonths(6):datetime(end_date);
+
+colorOrder = get(gca,'ColorOrder'); % Get the default color order
+for i = 1:length(hab_taxa)-1
+    figure(1)
+    subplot(2,1,1);
+    hold on;
+    plot(datetime(habs_taxa.datetime), habs_taxa{:,i},'Color',colorOrder(mod(i-1,size(colorOrder,1))+1,:))
+    % Set x-axis ticks and labels
+        datetick('x')
+        xticks(date_range);
+        xticklabels(datestr(date_range, 'mmm, yyyy'));
+        xtickangle(30);  % Angle the dates for better visibility
+            xlim([start_date,end_date])
+    
+    gcf
+    subplot(2,1,2)
+    plot(Monterey_lvl_1_5.Dateddmmyyyy,Monterey_lvl_1_5.AOD_500nm)
+    % Set x-axis ticks and labels
+        datetick('x')
+        xticks(date_range);
+        xticklabels(datestr(date_range, 'mmm, yyyy'));
+        xtickangle(30);  % Angle the dates for better visibility
+            xlim([start_date,end_date])
+    
+    set(gcf,'Position',[0 0 1600 700])
+
+
+end
+
+
+
+%% San Lorenzo outflow
+load('sanlorenzootflow.mat')
+
+%Add to bray
+
+
+sanlorenzodailyoutflow.dayOfYear=day(sanlorenzodailyoutflow.datetime, 'dayofyear');
+
+
+%Compute and add anomaly
+sanlorenzodailyoutflow_climatology=climatology(sanlorenzodailyoutflow,'outflow');
+sanlorenzodailyoutflow = join(sanlorenzodailyoutflow, sanlorenzodailyoutflow_climatology, 'Keys', 'dayOfYear');
+sanlorenzodailyoutflow.anomaly=sanlorenzodailyoutflow.outflow-sanlorenzodailyoutflow.nanmedian_outflow;
+
+figure(1)
+yyaxis left
+plotClimatology(sanlorenzodailyoutflow,'outflow')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year==i),sanlorenzodailyoutflow.outflow(sanlorenzodailyoutflow.datetime.Year==i),'Color', color,'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['Outflow [CFS]']);
+title('San Lorenzo River Outflow');
+xlim([0 365])
+legend(["Climatology","2020","2021","2022","2023"])
+set(gcf,'Position',[0 0 1600 700])
+
+
+
+%% BEUTI
+load("BEUTIdaily_SC.mat")
+BEUTI_SC.dayOfYear=day(BEUTI_SC.datetime, 'dayofyear');
+
+%Compute and add anomaly
+BEUTI_SC_climatology=climatology(BEUTI_SC,'BEUTI');
+BEUTI_SC = join(BEUTI_SC, BEUTI_SC_climatology, 'Keys', 'dayOfYear');
+BEUTI_SC.anomaly=BEUTI_SC.BEUTI-BEUTI_SC.nanmedian_BEUTI;
+
+
+figure(2)
+yyaxis left
+plotClimatology(BEUTI_SC,'BEUTI')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(BEUTI_SC.dayOfYear(BEUTI_SC.datetime.Year==i),BEUTI_SC.BEUTI(BEUTI_SC.datetime.Year==i),'Color', color,'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['BEUTI at 37N']);
+title('BEUTI');
+xlim([0 365])
+legend(["Climatology","2020","2021","2022","2023"])
+set(gcf,'Position',[0 0 1600 700])
+
+
+%% MEI
+
+load('mei.mat')
+mei.dayOfYear=month(mei.datetime, 'monthofyear');
+
+%Compute and add anomaly
+mei_climatology=climatology(mei,'mei');
+mei = join(mei, mei_climatology, 'Keys', 'dayOfYear');
+mei.anomaly=mei.mei-mei.nanmedian_mei;
+
+
+figure(2)
+yyaxis left
+plotClimatology(mei,'mei')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(mei.dayOfYear(mei.datetime.Year==i),mei.mei(mei.datetime.Year==i),'Color', color,'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['MEI']);
+title('Multivariate ENSO Iddex');
+xlim([0 365])
+legend(["Climatology","2020"])
+set(gcf,'Position',[0 0 1600 700])
+
+
+%% MLM Wharf Temp
+load('mlm_sst.mat')
+mlm_sst_tt=table2timetable(mlm_sst);
+mlm_sst_tt=retime(mlm_sst_tt,'daily','linear');
+mlm_sst_tt.dayOfYear=day(mlm_sst_tt.datetime, 'dayofyear');
+
+%Compute and add anomaly
+mlm_sst_tt_climatology=climatology(mlm_sst_tt,'sea_water_temperature');
+mlm_sst_tt = join(mlm_sst_tt, mlm_sst_tt_climatology, 'Keys', 'dayOfYear');
+mlm_sst_tt.anomaly=mlm_sst_tt.sea_water_temperature-mlm_sst_tt.nanmedian_sea_water_temperature;
+
+% Apply moving average filter
+windowSize = 7; % Choose an appropriate window size
+smoothed_sst = movmean(mlm_sst_tt.sea_water_temperature, windowSize);
+
+% Update timetable with smoothed SST
+mlm_sst_tt.smoothedSST = smoothed_sst;
+
+% Plot original and smoothed SST
+plot(mlm_sst_tt.datetime, mlm_sst_tt.sea_water_temperature, 'b', mlm_sst_tt.datetime, smoothed_sst, 'r');
+xlabel('Date');
+ylabel('SST');
+legend('Original SST', 'Smoothed SST');
+title('Sea Surface Temperature with Moving Average Smoothing');
+
+figure(2)
+yyaxis left
+plotClimatology(mlm_sst_tt,'sea_water_temperature')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(mlm_sst_tt.dayOfYear(mlm_sst_tt.datetime.Year==i),mlm_sst_tt.smoothedSST(mlm_sst_tt.datetime.Year==i),'Color', color,'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['Sea Surface Temperature [deg C]']);
+title('MLM SST');
+xlim([0 365])
+legend(["Climatology","2020"])
+set(gcf,'Position',[0 0 1600 700])
+
+
+
+%% NPGO
+
+load('npgo.mat')
+npgo_tt=retime(table2timetable(npgo),'monthly');
+npgo_tt.dayOfYear=day(npgo_tt.datetime, 'dayofyear');
+
+
+%Compute and add anomaly
+npgo_tt_climatology=climatology(npgo_tt,'NPGOIndex');
+npgo_tt = join(npgo_tt, npgo_tt_climatology, 'Keys', 'dayOfYear');
+npgo_tt.anomaly=npgo_tt.NPGOIndex-npgo_tt.nanmedian_NPGOIndex;
+
+figure(2)
+yyaxis left
+plotClimatology(npgo_tt,'NPGOIndex')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(npgo_tt.dayOfYear(npgo_tt.datetime.Year==i),npgo_tt.NPGOIndex(npgo.datetime.Year==i),'Color', color,'LineStyle','-', ...
+        'LineWidth',2,'Marker','*')
+    
+end
+ylabel(['Sea Surface Temperature [deg C]']);
+title('Santa Cruz Wharf SST');
+xlim([0 365])
+legend(["Climatology","2020"])
+set(gcf,'Position',[0 0 1600 700])
+
+
+%% Wind stress
+
+load('ndbc_46042.mat')
+
+
+ndbc46042_tt=(table2timetable(ndbc46042(:,2:end)));
+ndbc46042_tt= sortrows(ndbc46042_tt);
+ndbc46042_tt=retime(ndbc46042_tt,'daily','nearest');
+
+%Compute and add anomaly
+ndbc46042_tt_climatology=climatology(ndbc46042_tt,'wspd_across');
+ndbc46042_tt = join(ndbc46042_tt, ndbc46042_tt_climatology, 'Keys', 'dayOfYear');
+ndbc46042_tt.anomaly=ndbc46042_tt.wspd_across-ndbc46042_tt.nanmedian_wspd_across;
+
+subplot(2,1,1)
+plot(ndbc46042_tt.datetime,ndbc46042_tt.wspd_across)
+xlim([(datetime(2020,1,1)),(datetime(2020,12,1))])
+subplot(2,1,2)
+plot(movmean(datenum(ndbc46042.datetime),100),movmean(ndbc46042.wspd_across,100))
+datetick('x')
+xlim([datenum(datetime(2020,1,1)),datenum(datetime(2020,12,1))])
+
+%% Subplot with all climatologies and 2020
+
+
+%Set up plot
+n_subplot=8;
+colors_p= [...
+    0.2157 0.4941 0.7216;  % Light Blue
+    0.8941 0.1020 0.1098;  % Dark Red
+    0.3020 0.6863 0.2902;  % Light Green
+    0.5961 0.3059 0.6392;  % Dark Purple
+    0.9686 0.5059 0.7490;  % Pink
+    1.0000 0.7333 0.4706;  % Peach
+    0.6509 0.8078 0.8902;  % Light Sky Blue
+    0.9961 0.6941 0.5569;  % Light Salmon
+    0.6510 0.6510 0.6510;  % Gray
+    0.3010 0.3010 0.3010]; % Dark Gray
+
+figure(1)
+
+
+%AOD
+n_plot=n_subplot-n_subplot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left;
+plotClimatology(Monterey_lvl_1_5(Monterey_lvl_1_5.datetime.Year ~= 2020,:),'AOD_500nm')
+ylim([0 0.2])
+hold on 
+yyaxis right;
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020),'Color','b','LineStyle','-','LineWidth',2);
+ylabel(['AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+legend(["Climatology","2020"])
+
+
+%BEUTI
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(BEUTI_SC,'BEUTI')
+hold on 
+yyaxis right
+for i=2020
+    color = rand(1,3); % Generate a random RGB color
+    plot(BEUTI_SC.dayOfYear(BEUTI_SC.datetime.Year==i),BEUTI_SC.BEUTI(BEUTI_SC.datetime.Year==i),'Color', '#008080','LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['BEUTI at 37N']);
+title('BEUTI');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+%NDBC Wind stress
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(ndbc46042_tt,'wspd_across')
+ylabel(['Average Alongshore Wind']);
+
+hold on 
+yyaxis right
+for i=2020
+    year_sel=ndbc46042_tt(ndbc46042_tt.datetime.Year==i,:);
+    year_sel=sortrows(year_sel, 'dayOfYear', 'ascend');
+    color = rand(1,3); % Generate a random RGB color
+    plot(year_sel.dayOfYear,year_sel.wspd_across,'Color', colors_p(7,:),'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['Wind Speed [m/s]']);
+title('NDBC Alongshore Wind');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+
+%Outflow
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(sanlorenzodailyoutflow,'outflow')
+hold on 
+yyaxis right
+for i=2020
+    
+    plot(sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year==i),sanlorenzodailyoutflow.outflow(sanlorenzodailyoutflow.datetime.Year==i),'Color', colors_p(1,:),'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['Outflow [CFS]']);
+title('San Lorenzo River Outflow');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+hold on
+
+
+%SST
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(mlm_sst_tt,'sea_water_temperature')
+ylabel(['Average Sea Surface',newline,'Temperature [deg C]']);
+
+hold on 
+yyaxis right
+for i=2020
+    year_sel=mlm_sst_tt(mlm_sst_tt.datetime.Year==i,:);
+    year_sel=sortrows(year_sel, 'dayOfYear', 'ascend');
+    color = rand(1,3); % Generate a random RGB color
+    plot(year_sel.dayOfYear,year_sel.smoothedSST,'Color', colors_p(3,:),'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+    
+end
+ylabel(['Sea Surface',newline,'Temperature [deg C]']);
+title('Moss Landing Marine Lab Temperature');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+%Nutrients
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(HABs_SantaCruzWharf,'Nitrate')
+ylabel(['Average Nitrate']);
+
+hold on 
+yyaxis right
+for i=2020
+    year_sel=HABs_SantaCruzWharf(HABs_SantaCruzWharf.datetime.Year==i,:);
+    year_sel=sortrows(year_sel, 'dayOfYear', 'ascend');
+    color = rand(1,3); % Generate a random RGB color
+    plot(year_sel.dayOfYear,year_sel.Nitrate,'Color', colors_p(4,:),'LineStyle','none', ...
+        'LineWidth',2,'Marker','o')
+end
+ylabel(['Nitrate']);
+title('Santa Cruz Wharf Nitrate');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+
+%Phosphate
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(HABs_SantaCruzWharf,'Phosphate')
+ylabel(['Average Phosphate']);
+
+hold on 
+yyaxis right
+for i=2020
+    year_sel=HABs_SantaCruzWharf(HABs_SantaCruzWharf.datetime.Year==i,:);
+    year_sel=sortrows(year_sel, 'dayOfYear', 'ascend');
+    color = rand(1,3); % Generate a random RGB color
+    plot(year_sel.dayOfYear,year_sel.Phosphate,'Color', colors_p(5,:),'LineStyle','none', ...
+        'LineWidth',2,'Marker','o')
+    
+end
+ylabel(['Phosphate']);
+title('Santa Cruz Wharf Phosphate');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+%Silicate
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+yyaxis left
+plotClimatology(HABs_SantaCruzWharf,'Silicate')
+ylabel(['Average Silicate']);
+
+hold on 
+yyaxis right
+for i=2020
+    year_sel=HABs_SantaCruzWharf(HABs_SantaCruzWharf.datetime.Year==i,:);
+    year_sel=sortrows(year_sel, 'dayOfYear', 'ascend');
+    color = rand(1,3); % Generate a random RGB color
+    plot(year_sel.dayOfYear,year_sel.Silicate,'Color', colors_p(5,:),'LineStyle','none', ...
+        'LineWidth',2,'Marker','o')
+    
+end
+ylabel(['Silicate']);
+title('Santa Cruz Wharf Silicate');
+xlim([0 365])
+legend(["Climatology","2020"])
+
+
+
+
+%Add IFCB bray sum of all categories
+ifcbbray.dayOfYear=day(ifcbbray.datetime, 'dayofyear');
+ifcbbray.all_sum=nansum(ifcbbray{:, 3:53}, 2);
+
+%IFCB Taxa
+%
+% subplot(n_subplot, 1, 5);
+% % plotClimatology(ifcbbray, 'all_sum');
+% hold on;
+% 
+% for ii = 1:length(significant_results.Taxa)
+%     color = rand(1,3); % Generate a random RGB color
+%     column_idx = find(strcmp(ifcbbray.Properties.VariableNames, significant_results.Taxa{ii}));
+%     % if significant_results.Taxa{ii}=="Centric"
+%     %     yyaxis left
+%     % else 
+%     %     yyaxis right
+%     % end
+%     % Filter rows based on the year
+%     year_index = ifcbbray.datetime.Year == 2020;
+% 
+%     % Select only the rows for the year 2020
+%     year_data = ifcbbray(year_index, :);
+% 
+%     % Plot the selected data
+%     plot(year_data.dayOfYear, (year_data.(significant_results.Taxa{ii})), 'Color', color, 'LineStyle', '-', ...
+%         'LineWidth', 2, 'Marker', '.');
+% end
+% 
+% ylabel('Cells/L');
+% title('Santa Cruz Wharf SST');
+% xlim([0 365]);
+% legend(legend_labels = [significant_results.Taxa']);
+
+% Set figure position
+set(gcf, 'Position', [0 0 1600 800]);
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+".png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+".pdf"]);
+end
+saving=0;
+
+
+
+
+%% Subplots with anomalies only
+n_subplot=7;
+n_plot=0;
+
+
+
+
+figure(1)
+i=2020;
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(Monterey_lvl_1_5.datetime(Monterey_lvl_1_5.datetime.Year==i)),Monterey_lvl_1_5.anomaly(Monterey_lvl_1_5.datetime.Year==i))
+datetick('x')
+ylabel(['AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(BEUTI_SC.datetime(BEUTI_SC.datetime.Year==i)),BEUTI_SC.anomaly(BEUTI_SC.datetime.Year==i))
+datetick('x')
+ylabel(['BEUTI at 37N']);
+title('BEUTI');
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(ndbc46042_tt.datetime(ndbc46042_tt.datetime.Year==i)),ndbc46042_tt.anomaly(ndbc46042_tt.datetime.Year==i))
+datetick('x')
+ylabel(['Wind Speed [m/s]']);
+title('NDBC Alongshore Wind');
+
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(sanlorenzodailyoutflow.datetime(sanlorenzodailyoutflow.datetime.Year==i)),sanlorenzodailyoutflow.anomaly(sanlorenzodailyoutflow.datetime.Year==i))
+datetick('x')
+ylabel(['Outflow [CFS]']);
+title('San Lorenzo River Outflow');
+
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(mlm_sst_tt.datetime(mlm_sst_tt.datetime.Year==i)),mlm_sst_tt.anomaly(mlm_sst_tt.datetime.Year==i))
+datetick('x')
+ylabel(['Sea Surface',newline,'Temperature [deg C]']);
+title('Moss Landing Marine Lab Temperature');
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(HABs_SantaCruzWharf.datetime(HABs_SantaCruzWharf.datetime.Year==i)),HABs_SantaCruzWharf.anomaly_Nitrate(HABs_SantaCruzWharf.datetime.Year==i))
+datetick('x')
+ylabel(['Nitrate']);
+title('Nitrate');
+
+n_plot=n_plot+1;
+subplot(n_subplot,1,n_plot)
+shade_anomaly(datenum(HABs_SantaCruzWharf.datetime(HABs_SantaCruzWharf.datetime.Year==i)),HABs_SantaCruzWharf.anomaly_Phosphate(HABs_SantaCruzWharf.datetime.Year==i))
+datetick('x')
+ylabel(['Phosphate']);
+title('HABS Phosphate');
+
+% Set figure position
+set(gcf, 'Position', [-400 800 1600 1200]);
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+"_anomalies.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+"_anomalies.pdf"]);
+end
+saving=0;
+
+%%
+%Set up plot
+n_subplot=7;
+
+figure(1)
+
+
+%AOD
+
+plot(sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year==i),sanlorenzodailyoutflow.anomaly(sanlorenzodailyoutflow.datetime.Year==i),'Color', colors_p(1,:),'LineStyle','-', ...
+        'LineWidth',2,'Marker','.')
+hold on
+plot([min(sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year == 2020)) max(sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year == 2020))],[0 0], 'Color','k','LineWidth',1)
+hold on
+% % % Get the x and y data of the first line
+% x_data = sanlorenzodailyoutflow.dayOfYear(sanlorenzodailyoutflow.datetime.Year == 2020);
+% y_data = sanlorenzodailyoutflow.anomaly(sanlorenzodailyoutflow.datetime.Year == 2020);
+% 
+% % Find the indices of negative values
+% negative_indices = y_data < 0;
+% positive_indices = y_data > 0;
+% 
+% % Fill between the first line and zero in red
+% fill([x_data(positive_indices), fliplr(x_data(positive_indices))], [y_data(positive_indices), zeros(size(y_data(positive_indices)))], 'r', 'EdgeColor', 'none');
+% hold on
+% % Fill between negative values and zero in blue
+% fill([x_data(negative_indices), fliplr(x_data(negative_indices))], [y_data(negative_indices), zeros(size(y_data(negative_indices)))], 'b', 'EdgeColor', 'none');
+
+
+ylabel(['AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+legend(["Climatology","2020"])
+%%
+
+%AOD
+
+plot(sanlorenzodailyoutflow.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.anomaly(Monterey_lvl_1_5.datetime.Year == 2020),'Color','b','LineStyle','-','LineWidth',2);
+hold on
+plot([min(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020)) max(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020))],[0 0], 'Color','k','LineWidth',1)
+hold on
+% Get the x and y data of the first line
+x_data = Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020);
+y_data = Monterey_lvl_1_5.anomaly(Monterey_lvl_1_5.datetime.Year == 2020);
+
+% Find the indices of negative values
+negative_indices = y_data < 0;
+positive_indices = y_data > 0;
+
+% Fill between the first line and zero in red
+fill([x_data(positive_indices), fliplr(x_data(positive_indices))], [y_data(positive_indices), zeros(size(y_data(positive_indices)))], 'r', 'EdgeColor', 'none');
+hold on
+% Fill between negative values and zero in blue
+fill([x_data(negative_indices), fliplr(x_data(negative_indices))], [y_data(negative_indices), zeros(size(y_data(negative_indices)))], 'b', 'EdgeColor', 'none');
+
+
+ylabel(['AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+legend(["Climatology","2020"])
+
+set(gcf, 'Position', [-400 700 1600 1200]);
+
+
+%% Physical Drivers: Upwelling, Wind, 
+
+
+%% Nutrients
+
+
+
+
+
+%% Histograms of cell abundances
+
+clf;
+figure(1)
+associated_dates = ifcbbray.datetime.Year;
+num_bins=ceil(sqrt(height(ifcbbray)));
+
+% Create histogram
+yyaxis left
+histogram(log10(ifcbbray.Centric), num_bins, 'Normalization', 'probability');
+hold on
+
+ifcb_2020_sel=ifcbbray(ifcbbray.datetime > datetime(2020,8,1) & ifcbbray.datetime < datetime(2020,10,1),:);
+% num_bins_2020=ceil(sqrt(height(ifcb_2020_sel)))
+num_bins_2020=ceil(1 + log2(height(ifcb_2020_sel)));
+yyaxis right
+histogram(log10(ifcb_2020_sel.Centric),num_bins_2020, 'Normalization', 'probability');
+
+
+%% PDF
+figure;
+
+
+% Extract the data for the first dataset
+data_first = log10(ifcbbray.Centric);
+
+data_first=data_first(~isnan(data_first) & ~isinf(data_first));
+% Estimate the PDF using kernel density estimation
+[f_first, x_first] = ksdensity(data_first);
+
+% Plot the PDF line plot for the first dataset
+plot(x_first, f_first, 'LineWidth', 2);
+hold on;
+
+% Extract the data for the second dataset
+data_second = log10(ifcb_2020_sel.Centric);
+
+% Estimate the PDF using kernel density estimation
+[f_second, x_second] = ksdensity(data_second);
+
+% Plot the PDF line plot for the second dataset
+plot(x_second, f_second, 'LineWidth', 2);
+
+% Add legend
+legend({'All Years', '2020'});
+
+% Optionally, set labels and titles
+xlabel('log10(Centric)');
+ylabel('Probability Density');
+title('Probability Density Function Comparison');
+
+%% PDF of Taxa that 'respond'
+
+ifcb_2020_sel=ifcbbray(ifcbbray.datetime > datetime(2020,8,1) & ifcbbray.datetime < datetime(2020,10,1),:);
+
+% Get unique categories from significant_results.Taxa
+unique_taxa = unique(significant_results.Taxa);
+
+% Set the number of rows and columns for subplots
+num_rows = ceil(sqrt(numel(unique_taxa)));
+num_cols = ceil(numel(unique_taxa) / num_rows);
+
+% Create a figure
+figure(3);
+
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9   % Purple
+];
+
+for ii = 1:numel(unique_taxa)
+    % Extract data for the current category in the full dataset
+    current_category = unique_taxa{ii};
+    data_full = log10(ifcbbray.(current_category));
+    data_full = data_full(~isnan(data_full) & ~isinf(data_full));
+
+    % Estimate the PDF using kernel density estimation for the full dataset
+    [f_full, x_full] = ksdensity(data_full);
+
+    % Create a subplot for the full dataset
+    subplot(num_rows, num_cols, ii);
+    plot(x_full, f_full, 'LineWidth', 2,'Color','black');
+    hold on;
+    area(x_full, f_full, 'FaceColor', 'black', 'FaceAlpha', 0.5); % Fill under the curve
+    xlabel(['log10(' current_category ')']);
+    ylabel('Probability Density');
+    title(['PDF for ' current_category ' (Full Dataset)']);
+
+
+    % Extract data for the current category within the specified window
+    data_window = log10(ifcb_2020_sel.(current_category));
+    data_window = data_window(~isnan(data_window) & ~isinf(data_window));
+    
+    % Estimate the PDF using kernel density estimation for the window
+    [f_window, x_window] = ksdensity(data_window);
+
+    % Create a new subplot for the data within the window
+    subplot(num_rows, num_cols, ii);
+    plot(x_window, f_window, 'LineWidth', 2,'Color',colorz(ii,:));
+    hold on;
+    area(x_window, f_window, 'FaceColor', colorz(ii,:), 'FaceAlpha', 0.7); % Fill under the curve
+    xlabel(['log10(Cells/L)']);
+        ylabel('Probability Density');
+    title([current_category]);
+
+    % Optionally, you can customize axis limits or add additional formatting as needed
+end
+% Adjust the layout
+sgtitle('Probability Density Function Comparison for Different Taxa');
+
+
+
+set(gcf, 'Position', [0 0 1600 1000]);
+
+
+saving=0;
+if saving==1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\ifcb\pdfs\ifcb_taxa_pdfs.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\ifcb\pdfs\ifcb_taxa_pdfs.pdf");
+end
+
+
+
+
+
+
+
+%% Other Cross correlations-make mega table
+load('ifcb_bray.mat')
+ifcbbray.datetime=ifcbbray.datetime;
+ifcb_bray_tt=table2timetable(ifcbbray);
+mlm_sst_tt.datetime.TimeZone = 'America/Los_Angeles'; % Convert to PST
+ifcb_bray_tt.datetime.TimeZone = 'America/Los_Angeles'; % Convert to PST
+joined_tt=synchronize(ifcb_bray_tt,mlm_sst_tt,'first','nearest');
+
+
+%%
+
+
+
+
+% Goal: Plot with taxa on y, time lag on the x and 
+
+% Extract the taxa columns and AOD_500nm column
+taxa_data = table2array(joined_tt(:, 3:53));
+sst=joined_tt.sea_water_temperature;
+
+% Initialize variables to store coefficients and lags
+cc= zeros(size(taxa_data, 1)*2-1,size(taxa_data, 2));
+lags = zeros(size(taxa_data, 2), size(taxa_data, 1)*2-1);
+
+taxa=joined_tt.Properties.VariableNames(3:53);
+
+for i=1:size(taxa_data, 2)
+
+    %Compute climatology and anomaly
+    eval([taxa{i},'_climatology=climatology(joined_tt,taxa{i})']);
+    eval(['joined_tt = join(joined_tt,',taxa{i},'_climatology, ''Keys'', ''dayOfYear'');']);
+    eval(['joined_tt.',taxa{i},'_anomaly=joined_tt.',taxa{i},'-joined_tt.nanmedian_',taxa{i},';'])
+
+    %Cross-correlate
+    eval(['[cc(:,i),lags(i,:)] = xcorr(fillmissing(sst, ''linear''),joined_tt.',taxa{i},'_anomaly,''coeff'');'])
+    % Plot the cross-correlation
+    plotting=0;
+    if plotting==1
+    figure(1)
+    % stem(lags, cc);
+    plot(lags(i,:),cc(:,i),'LineStyle','-','LineWidth',2)
+    hold on
+    title("Cross-correlation between AOD 500nm &"+newline+ "Phytoplankton Groups");
+    xlabel('Lags (Days)');
+    ylabel('Normalized Cross-correlation');
+    end
+    % xlim([-30,50])
+end
+ 
+
+%%
+
+
+% Create a heatmap
+
+xmax=500;
+xmin=xmax*-1;
+taxa=joined_tt.Properties.VariableNames(3:53);
+taxa = strrep(taxa, '_', ' ');
+lag=lags(1,:);
+
+%Plotting 
+XLabels = lag;
+% Convert each number in the array into a string
+CustomXLabels = string(XLabels);
+% Replace all but the fifth elements by spaces
+CustomXLabels(mod(XLabels,xmax/10) ~= 0) = " ";
+% Set the 'XDisplayLabels' property of the heatmap 
+% object 'h' to the custom x-axis tick labels
+
+figure()
+h=heatmap(lag,taxa,cc')
+% heatmap(joined_tt.Properties.VariableNames(1:51), lag,cc')
+xlim([-xmin,xmax])
+% squeeze(correlationMatrix(:,:,numLags+1))
+colorbar; % Add colorbar to show strength of coefficients
+title('Cross-correlation between Phytoplankton Abundance Anomaly and Aerosol Optical Depth at 500nm');
+xlabel('Lag (days)');
+ylabel('Taxa')
+
+
+colormap('jet')
+xlim([xmin xmax]);
+h.XDisplayLabels = CustomXLabels;
+h.GridVisible = 'off';
+s = struct(h);
+s.XAxis.TickLabelRotation = 45;  % vertical
+set(gcf,'Position',[-400 900 1200 1000])
+
+
+%% SCRAP
+
+
+
+%Modify downloaded data
+% ndbc_46042.wd=double(ndbc_46042.wd);
+% ndbc46042.wspd_along=ndbc46042.wspd .* cos(deg2rad(ndbc46042.wd));
+% ndbc46042.wspd_across=ndbc46042.wspd .* sin(deg2rad(ndbc46042.wd));
+% epoch_start = datetime(1970, 1, 1); % Epoch start time
+% % Convert TIS time to datetime
+% ndbc46042.datetime = epoch_start + seconds(ndbc46042.time);
+% ndbc46042.dayOfYear=day(ndbc46042.datetime, 'dayofyear');
+% Compute wind stress curl
+% curl_tau = zeros(size(ndbc46042.wspd_across));
+% 
+% for i = 2:size(ndbc46042.wspd_across, 1)-1
+%     for j = 2:size(ndbc46042.wspd_across, 2)-1
+%         % Compute partial derivatives using central differences
+%         dudx = (ndbc46042.wspd_across(i, j+1) - ndbc46042.wspd_across(i, j-1)) / 2;
+%         dvdy = (ndbc46042.wspd_along(i+1, j) - ndbc46042.wspd_along(i-1, j)) / 2;
+% 
+%         % Compute wind stress curl
+%         curl_tau(i, j) = dvdy - dudx;
+%     end
+% end
+
+% ndbc46042.curl_tau=curl_tau;
+
+%% Functions
+function plotClimatology(dataTable,input_var)
+    % Extract day of the year for each datetime entry
+    dayOfYear = day(dataTable.datetime, 'dayofyear');
+    dataTable.dayOfYear = dayOfYear;
+
+    % Group by dayOfYear and compute the mean for each group
+    climatology = varfun(@nanmedian, dataTable, 'GroupingVariables', 'dayOfYear', 'InputVariables', input_var);
+
+    % Plotting
+    plot(climatology.dayOfYear, eval(['climatology.nanmedian_' input_var]),'Color','#a6a6a6','LineStyle','-','LineWidth',2);
+    hold on
+    xlabel('Day of Year');
+    ylabel(['Average ' replace(input_var, "_", " ")]);
+    % title('Climatology of Chl A');
+    datetick('x')
+    grid on;
+end
+
+
+%%
+function climatology_out=climatology(dataTable,input_var)
+    % Extract day of the year for each datetime entry
+    dayOfYear = day(dataTable.datetime, 'dayofyear');
+    dataTable.dayOfYear = dayOfYear;
+
+    % Group by dayOfYear and compute the mean for each group
+    climatology_out = varfun(@nanmedian, dataTable, 'GroupingVariables', 'dayOfYear', 'InputVariables', input_var);
+
+end
+
+%% 
+function climatology_out=climatology_weekly(dataTable,input_var)
+    % Extract day of the year for each datetime entry
+    weekOfYear = week(dataTable.datetime, 'weekofyear');
+    dataTable.weekOfYear = weekOfYear;
+
+    % Group by weekOfYear and compute the mean for each group
+    climatology_out = varfun(@nanmedian, dataTable, 'GroupingVariables', 'weekOfYear', 'InputVariables', input_var);
+
+end
+
+%% 
+function climatology_out=climatology_monthly(dataTable,input_var)
+    % Extract day of the year for each datetime entry
+    monthOfYear = month(dataTable.datetime, 'monthofyear');
+    dataTable.monthOfYear = monthOfYear;
+
+    % Group by monthOfYear and compute the mean for each group
+    climatology_out = varfun(@nanmedian, dataTable, 'GroupingVariables', 'monthOfYear', 'InputVariables', input_var);
+
+end
+
+
+function plotClimatologymax(dataTable,input_var)
+    % Extract day of the year for each datetime entry
+    dayOfYear = day(dataTable.datetime, 'dayofyear');
+    dataTable.dayOfYear = dayOfYear;
+
+    % Group by dayOfYear and compute the mean for each group
+    climatology = varfun(@nanmax, dataTable, 'GroupingVariables', 'dayOfYear', 'InputVariables', input_var);
+
+    % Plotting
+    plot(climatology.dayOfYear, eval(['climatology.nanmax_' input_var]),'Color','#a6a6a6','LineStyle','-','LineWidth',2);
+    hold on
+    xlabel('Day of Year');
+    ylabel(['Max ' replace(input_var, "_", " ")]);
+    % title('Climatology of Chl A');
+    datetick('x')
+    grid on;
+end

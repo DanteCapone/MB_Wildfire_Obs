@@ -1,0 +1,496 @@
+%% MERRA Processing Script
+
+% Add your folder path containing NetCDF files
+folderPath = 'Q:\Dante\data\MB_Wildfire_obs\merra-2';
+files = dir(fullfile(folderPath, '*.nc4'));
+files = files; 
+
+% Load California coast from the shapefile
+coastPath = 'Q:\Dante\data\MB_Wildfire_Obs\matlab\ne_10m_coastline'; % Update this path to where your shapefile is stored
+coastline = shaperead(fullfile(coastPath, 'ne_10m_coastline.shp'), 'UseGeoCoords', true);
+
+
+%% Subset to Monterey Bay
+
+% Define latitude and longitude limits for subsetting
+latLimits = [36.3219, 37.180664];
+lonLimits = [-122.68085, -121.6675];
+
+% Initialize table to store date and median BCCMASS values
+bc_avg = table(datetime, 0, 'VariableNames', {'Date', 'Median_BCCMASS'});
+
+% Loop through each file in the directory
+for i = 1:length(files)
+    filename = files(i).name;
+    
+    % Extract the date from the filename
+    dateStr = regexp(filename, '\d{8}', 'match');
+    date = datetime(dateStr, 'InputFormat', 'yyyyMMdd');
+    
+    % Read latitude and longitude data
+    lat = ncread(fullfile(folderPath, filename), 'lat');
+    lon = ncread(fullfile(folderPath, filename), 'lon');
+    
+    % Find indices for lat and lon within specified limits
+    latIdx = find(lat >= latLimits(1) & lat <= latLimits(2));
+    lonIdx = find(lon >= lonLimits(1) & lon <= lonLimits(2));
+    
+    % Read BCCMASS variable and subset according to the indices
+    BCCMASS = ncread(fullfile(folderPath, filename), 'BCCMASS');
+    BCCMASS_sub = BCCMASS(lonIdx, latIdx, :);
+    
+    % Calculate median BCCMASS in the subset
+    medianBCCMASS = median(BCCMASS_sub(:), 'omitnan');
+    
+    % Store the results in the table
+    bc_avg = [bc_avg; {date, medianBCCMASS}];
+end
+
+% Remove the initial row used for table initialization
+bc_avg(1,:) = [];
+
+%% Make data continuous in time
+
+% Assuming 'bc_avg' is the table with the variables of interest.
+% Convert 'datetime' to MATLAB serial date numbers if they are in another format.
+dates_serial = datenum(bc_avg.datetime);
+
+% Create a continuous range of date numbers from start to end
+start_date = min(dates_serial);
+end_date = max(dates_serial);
+all_dates_serial = (start_date:end_date)';
+
+% Convert serial date numbers to datetime format
+all_dates_datetime = datetime(all_dates_serial, 'ConvertFrom', 'datenum');
+
+% Extract the day of year from the datetime
+all_days_of_year = day(all_dates_datetime, 'dayofyear');
+
+% Initialize the new table with NaN for 'Median_BCCMASS' and correct dates
+filled_bc_avg = table(NaN(size(all_dates_serial)), all_dates_datetime, all_days_of_year, ...
+                      'VariableNames', {'Median_BCCMASS', 'datetime', 'dayOfYear'});
+
+% Find the positions of existing dates in the continuous range
+[~, loc] = ismember(dates_serial, all_dates_serial);
+
+% Insert the existing 'Median_BCCMASS' data into the correct positions
+filled_bc_avg.Median_BCCMASS(loc) = bc_avg.Median_BCCMASS;
+
+
+% Save average merra bc over Monterey Bay
+%save('merra_MB_bc_avg_daily.mat',"bc_avg")
+
+%% Plotting the median BCCMASS values over time
+figure;
+plot(filled_bc_avg.datetime, filled_bc_avg.Median_BCCMASS, '-');
+title('Median BCCMASS over Time');
+xlabel('Date');
+ylabel('Median BCCMASS');
+grid on;
+
+
+%% Compute climatology
+merra_bc_climatology=climatology(bc_avg,'Median_BCCMASS');
+filled_bc_avg.dayOfYear=day(filled_bc_avg.datetime, 'dayofyear');
+merra_bc = join(filled_bc_avg, merra_bc_climatology, 'Keys', 'dayOfYear');
+merra_bc.anomaly=merra_bc.Median_BCCMASS-merra_bc.nanmedian_Median_BCCMASS;
+yyaxis left
+clf
+plotClimatology(filled_bc_avg(merra_bc.datetime.Year~=2020,:),'Median_BCCMASS')
+hold on
+gcf
+year_sel=(merra_bc.datetime.Year==2020);
+
+
+% First, create an index for non-NaN values for the anomaly column
+nan_indices = ~isnan(merra_bc.anomaly);
+
+% Filter the table to exclude rows with NaN in the 'anomaly' column
+merra_bc_plt = merra_bc(nan_indices, :);
+
+% Create a logical index for the year 2020 within the non-NaN subset
+year_sel = merra_bc_plt.datetime.Year == 2020;
+
+% Extract the 'dayOfYear' and 'anomaly' for the year 2020
+daysOfYear2020 = merra_bc_plt.dayOfYear(year_sel);
+anomaly2020 = merra_bc_plt.anomaly(year_sel);
+
+% Plot the data
+yyaxis right
+plot(daysOfYear2020, anomaly2020, 'r');
+ylabel('Average Black Carbon Surface Mass');
+xlabel('Day of Year');
+title('Black Carbon Anomaly for the Year 2020');
+
+
+
+%% Compare with AOD
+%Aeronet
+load('monterey_lvl_1.5.mat')
+load('monterey_lvl_2.0.mat')
+ind=Monterey_lvl_1_5.AOD_500nm == -999.0;
+Monterey_lvl_1_5.AOD_500nm(ind)=nan;
+
+%Compute and add anomaly
+Monterey_lvl_1_5.dayOfYear=day(Monterey_lvl_1_5.datetime, 'dayofyear');
+Monterey_lvl_1_5_climatology=climatology(Monterey_lvl_1_5,'AOD_500nm');
+Monterey_lvl_1_5 = join(Monterey_lvl_1_5, Monterey_lvl_1_5_climatology, 'Keys', 'dayOfYear');
+Monterey_lvl_1_5.anomaly=Monterey_lvl_1_5.AOD_500nm-Monterey_lvl_1_5.nanmedian_AOD_500nm;
+
+
+%% Plot Aeronet
+colorz = [
+    0.5451, 0, 0;        % Darker shade of Red
+    0.3333, 0.6588, 0.4078;  % Green
+    0.4, 0.6, 0.8;        % Blue
+    0.7882, 0.4588, 0.9216   % Pastel Purple
+];
+
+clf
+subplot(2,1,1)
+yyaxis left;
+plotClimatology(Monterey_lvl_1_5(Monterey_lvl_1_5.datetime.Year ~= 2020,:),'AOD_500nm')
+hold on
+alpha(0.1)
+ylim([0 0.2])
+hold on 
+yyaxis right;
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2008),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2008),'Color',colorz(1,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2016),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2016),'Color',colorz(2,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2021),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2021),'Color',colorz(4,:),'LineStyle','-','LineWidth',2);
+
+
+%Merra-2
+% First, create an index for non-NaN values for the anomaly column
+nan_indices = ~isnan(merra_bc.anomaly);
+
+% Filter the table to exclude rows with NaN in the 'anomaly' column
+merra_bc_plt = merra_bc(nan_indices, :);
+
+subplot(2,1,2)
+yyaxis left;
+plotClimatology(merra_bc(merra_bc.datetime.Year~=2020 & merra_bc.datetime.Year>2002,:),'Median_BCCMASS')
+
+alpha(0.1)
+hold on 
+yyaxis right;
+plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2008),merra_bc_plt.Median_BCCMASS(merra_bc_plt.datetime.Year == 2008),'Color',colorz(1,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2016),merra_bc_plt.Median_BCCMASS(merra_bc_plt.datetime.Year == 2016),'Color',colorz(2,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.Median_BCCMASS(merra_bc_plt.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2021),merra_bc_plt.Median_BCCMASS(merra_bc_plt.datetime.Year == 2021),'Color',colorz(4,:),'LineStyle','-','LineWidth',2);
+ylabel('Black Carbon Surface Mass Concentration')
+set(gcf,'Position',[0 900 1600 600])
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\monterey_merra2_plot.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\monterey_merra2_plot.pdf"]);
+end
+saving=0;
+
+
+%%
+alpha(0.1)
+ylim([0 0.2])
+hold on 
+yyaxis right;
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2008),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2008),'Color',colorz(1,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2016),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2016),'Color',colorz(2,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+hold on
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2021),Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2021),'Color',colorz(4,:),'LineStyle','-','LineWidth',2);
+
+ylabel(['Average AOD 500nm']);
+title('Monterey Aeronet Aerosol Optical Depth');
+
+
+% text
+text(148,1.5,["Indians Fire"+newline+"(Monterey, 2008)"],"Color",'g')
+text(175,3.8,["Soberanes Fire"+newline+"(Monterey, 2016)"],"Color",'b')
+text(200,5,["SCU Lightning Complex Fire"+newline+"(Santa Cruz, 2020)"],"Color",'r')
+legend({'Climatology (2003-present)','2008','2016','2020','2021'})
+set(gcf,'Position',[0 0 1600 600])
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%% Scrap
+% %%
+% % Initialize structure to store data
+% dataStruct = struct();
+% 
+% % Loop through each file in the directory
+% for i = 1:length(files)
+%     filename = files(i).name;
+% 
+%     % Extract the date from the filename
+%     dateStr = regexp(filename, '\d{8}', 'match');
+%     dataStruct(i).date = datetime(dateStr, 'InputFormat', 'yyyyMMdd');
+% 
+%     % Read latitude and longitude data
+%     lat = ncread(fullfile(folderPath, filename), 'lat');
+%     lon = ncread(fullfile(folderPath, filename), 'lon');
+% 
+%     % Read other variables as needed
+%     % For example, let's assume we need to read a variable named 'BCCMASS'
+%     BCCMASS = ncread(fullfile(folderPath, filename), 'BCCMASS');
+% 
+%     % Store data in the structure
+%     dataStruct(i).latitude = lat;
+%     dataStruct(i).longitude = lon;
+%     dataStruct(i).BCCMASS = BCCMASS;
+% end
+% 
+% 
+% 
+% 
+% %%
+% % Plotting
+% figure(1);
+% hold on;
+% % Plot California coastline
+%     geoshow(coastline.Lat, coastline.Lon, 'Color', 'black');
+%     hold on
+% 
+% % Define your bounding box
+% latLim = [32 42]; % Adjust these values to your specific latitude range
+% lonLim = [-124 -114]; % Adjust these values to your specific longitude range
+% 
+% % Overlay BCCMASS data, adjust transparency and color as needed
+% for i = 1:length(dataStruct)
+%     gcf
+%     imagesc(dataStruct(i).longitude, dataStruct(i).latitude, dataStruct(i).BCCMASS(:,:,1), 'AlphaData', ~isnan(dataStruct(i).BCCMASS(:,:,1)));
+%     set(gca, 'XLim', lonLim, 'YLim', latLim);
+%     pause(0.1)
+% end
+% 
+% colorbar; % Show color scale
+% title('BCCMASS Data Overlay on California Map');
+% axis xy; % Correct the axis orientation
+% hold off;
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% %%
+% % Define the directory where the files are located
+% folder = 'Q:\Dante\data\MB_Wildfire_obs\merra-2';
+% pattern = '2020\MERRA2_400.tavg1_2d_aer_Nx.2020*.nc4';
+% files = dir(fullfile(folder, pattern));
+% 
+% % Initialize structure to store data
+% dataStruct = struct();
+% 
+% % Loop through each file in the directory
+% for i = 1:length(files)
+%     filename = files(i).name;
+% 
+%     % Extract the date from the filename
+%     dateStr = regexp(filename, '\d{8}', 'match');
+%     dataStruct(i).date = datetime(dateStr, 'InputFormat', 'yyyyMMdd');
+% 
+%     % Read latitude and longitude data
+%     lat = ncread(fullfile(folderPath, filename), 'lat');
+%     lon = ncread(fullfile(folderPath, filename), 'lon');
+% 
+%     % Read other variables as needed
+%     % For example, let's assume we need to read a variable named 'BCCMASS'
+%     BCCMASS = ncread(fullfile(folderPath, filename), 'BCCMASS');
+% 
+%     % Store data in the structure
+%     dataStruct(i).latitude = lat;
+%     dataStruct(i).longitude = lon;
+%     dataStruct(i).BCCMASS = BCCMASS;
+% end
+% 
+% %% Compute daily averages
+% dates = keys(dailyData);
+% dailyAverages = containers.Map('KeyType', 'char', 'ValueType', 'any');
+% 
+% for k = 1:length(dates)
+%     currentDate = dates{k};
+%     % Compute average for the current date's data
+%     dailyAverages(currentDate) = mean(dailyData(currentDate), 3);  % Average across the third dimension
+% end
+% 
+% 
+% %% Convert Data for Further Processing or Visualization
+% dailyAverageCells = cell(length(dates), 2);
+% for k = 1:length(dates)
+%     dailyAverageCells{k, 1} = dates{k};
+%     dailyAverageCells{k, 2} = dailyAverages(dates{k});
+% end
+% 
+% % Column 1: Date strings
+% % Column 2: Daily averaged data matrices
+% for k = 1:size(dailyAverageCells, 1)
+%     dateStr = dailyAverageCells{k, 1};
+%     dateTime = datetime(dateStr, 'InputFormat', 'yyyyMMdd');  % Adjust format as necessary
+%     dailyAverageCells{k, 3} = dateTime;  % Adding datetime as the third column
+% end
+% 
+% %% Get Lat/Lon
+% 
+% % Define the directory where the files are located
+% folder = 'Q:\Dante\data\MB_Wildfire_obs\merra-2';
+% pattern = '2020\MERRA2_400.tavg1_2d_aer_Nx.2020*.nc4';
+% 
+% % Get a list of all files matching the pattern
+% files = dir(fullfile(folder, pattern));
+% 
+% % Predefine the concatenated data array
+% concatData = [];
+% lat = [];
+% lon = [];
+% time=[];
+% % Loop through each file to read data
+% for i = 1:length(files)
+%     % Construct full file path
+%     filepath = fullfile(files(i).folder, files(i).name);
+% 
+%     % Read latitude and longitude if empty (assuming it's the same for all files)
+%     if isempty(lat) || isempty(lon)
+%         lat = ncread(filepath, 'lat'); % Replace 'lat' with actual latitude variable name
+%         lon = ncread(filepath, 'lon'); % Replace 'lon' with actual longitude variable name
+%         time = ncread(filepath, 'time');
+%     end
+% 
+%     % Read the variable data
+%     data = ncread(filepath, 'BCSMASS'); % Replace 'dataVarName' with actual data variable name
+%     concatData = cat(3, concatData, data);
+% end
+% 
+% % Compute the 5-day average as before
+% % Assume the reshaping and averaging code is here (not repeated for brevity)
+% 
+% 
+% %%
+% % Generate Lat and Lon grids
+% [Lon, Lat] = meshgrid(lon, lat');
+% 
+% %% Plot 
+% %Map of CA
+% shapefilePath='ne_10m_coastline/ne_10m_coastline.shp';
+% S = shaperead(shapefilePath);  % Read the shapefile
+% figure;
+% geoshow(S, 'DisplayType', 'polygon');  % Display the shapefile
+% 
+% %%
+% 
+% figure; % Create a figure outside the loop if you want to update the same plot
+% mapshow(S, 'DisplayType',  'line', 'Color', 'black');  % Display the shapefile with specified styling
+% hold on
+% 
+% for k = 1:size(dailyAverageCells, 1)
+%     clf; % Clear the current figure content
+%     geoaxes; % Create a geographic axes object
+%     hold on; % Hold on to plot data and coastlines together
+% 
+%     data = dailyAverageCells{k, 2};  % Daily data matrix
+%     pcolor(Lon, Lat, data');  % Plot the data
+%     shading interp;  % Optional: makes the color shading smooth
+%     hold on
+%     % Plot high resolution coastlines
+% 
+%     colorbar;  % Add a colorbar
+%     title(datestr(dailyAverageCells{k, 3}, 'yyyy-mm-dd'));  % Use the datetime for the title
+%     drawnow;  % Update the plot
+%     pause(0.01);  % Pause briefly between frames
+% end
+% 
+% 
+% %%  Daily average
+% % Initialize an empty array to hold all data
+% % Assuming all data matrices have the same size, get this size from the first matrix
+% [dataRows, dataCols] = size(dailyAverageCells{1, 2});
+% numDays = size(dailyAverageCells, 1);
+% allData = NaN(dataRows, dataCols, numDays);  % Using NaN to initialize
+% 
+% % Fill the 3D array with data
+% for k = 1:numDays
+%     allData(:, :, k) = dailyAverageCells{k, 2};
+% end
+% 
+% % Compute maximum across the third dimension
+% maxData = max(allData, [], 3);
+% 
+% figure; % Create a new figure for the surface plot
+% surf(Lon, Lat, maxData');  % Use surf to plot the data
+% shading interp;  % Use interpolated shading to smooth the surface
+% colorbar;  % Add a colorbar to indicate the value scale
+% title('Maximum Values Across All Days');  % Title for the plot
+% xlabel('Longitude');  % Label for the x-axis
+% ylabel('Latitude');  % Label for the y-axis
+% zlabel('Max Value');  % Label for the z-axis (value axis)
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% 
+% %% Scrap
+% 
+% 
+% 
+% % Assume conversion of time values to datetime format here
+% timeUnits = ncreadatt(filepath, 'time', 'units');  % Example: 'minutes since 2000-01-01 00:00:00'
+% dateTimeArray = datetime(time, 'ConvertFrom', 'posixtime', 'TimeZone', 'UTC') + datenum(timeUnits);
+% 
+% % Loop through each time slice to plot
+% for j = 1:size(concatData, 3)
+%     figure;  % Create a new figure for each time slice
+%     pcolor(Lon, Lat, squeeze(concatData(:,:,j))');  % Display the data
+%     shading interp;  % Smooth color shading
+%     colorbar;  % Add a colorbar
+%     title(sprintf('BC Mass Concentration on %s', datestr(dateTimeArray(j), 'yyyy-mm-dd HH:MM')));  % Set title
+%     xlabel('Longitude');
+%     ylabel('Latitude');
+%     pause(1);  % Pause for 1 second between plots or use drawnow to update plots in the same window
+% end
+% 

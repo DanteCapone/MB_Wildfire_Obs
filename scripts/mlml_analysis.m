@@ -1,6 +1,7 @@
 %Process Data from Shore Station MLML
 
-load('Q:\Dante\data\MB_Wildfire_Obs\shore_stations\mlm_raw_5_2024.mat')
+% load('Q:\Dante\data\MB_Wildfire_Obs\shore_stations\mlm_raw_5_2024.mat')
+load('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\data\mlml_mlml_sea_d652_b4dc_f59f.mat')
 
 %%
 field_names = fieldnames(mlml_mlml_sea);
@@ -14,21 +15,85 @@ end
 
 % Convert the unique structure to table and timetable
 mlml_mlml_sea_t = struct2table(mlml_mlml_sea_unique);
+mlml_mlml_sea_t.datetime=datetime(mlml_mlml_sea_t.time, 'ConvertFrom', 'posixtime', 'Format', 'MM/dd/yyyy');
 mlml_tt = table2timetable(mlml_mlml_sea_t);
-mlm_tt_daily=retime(mlml_tt,'daily');
+
+
+%% Add flur anomaly
+mlml_chl=mlml_tt(mlml_tt.fluorescence_qc_agg==1,{'fluorescence'});
+mlml_chl=retime(mlml_chl,'daily','median');
+mlml_chl.dayOfYear=day(mlml_chl.datetime, 'dayofyear');
+mlml_chl_climatology=climatology(mlml_chl,'fluorescence');
+mlml_chl = join(mlml_chl, mlml_chl_climatology, 'Keys', 'dayOfYear');
+mlml_chl.anomaly=mlml_chl.fluorescence-mlml_chl.nanmedian_fluorescence;
+
+
+mlml_chl=mlml_tt(mlml_tt.fluorescence_qc_agg==1,{'fluorescence'});
+mlml_chl=retime(mlml_chl,'daily','median');
+mlml_chl.dayOfYear=day(mlml_chl.datetime, 'dayofyear');
+mlml_chl_climatology=climatologyWeekly(mlml_chl,'fluorescence');
+mlml_chl = join(mlml_chl, mlml_chl_climatology, 'Keys', 'dayOfYear');
+mlml_chl.anomaly=mlml_chl.fluorescence-mlml_chl.nanmedian_fluorescence;
+
 
 %% Plot
 
-% Define the date range
-start_date = datetime(2020, 7, 1);
-end_date = datetime(2020, 11, 1);
+month_labs = {'Jan', 'Feb', 'Ma', 'Apr', 'May', 'Jun', ...
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'};
 
-mlml_chl=mlml_tt(mlml_tt.fluorescence_qc_agg==1,{'fluorescence'});
-mlml_chl=retime(mlml_chl,'daily');
-plot(mlml_tt.datetime(mlml_tt.fluorescence_qc_agg==1),movmean(mlml_tt.fluorescence(mlml_tt.fluorescence_qc_agg==1),12*24,1,"omitmissing"))
-hold on
-xlim([start_date end_date])
+% Define the date range
+start_date = datetime(2010, 1, 1);
+end_date = datetime(2023, 12, 31);
+start_date_num = datenum(datetime(2020, 1, 1));
+end_date_num = datenum(datetime(2020, 12, 31));
+
+shade_start = day(datetime(2020,8,16),'dayofyear');
+shade_end = day(datetime(2020,9,23),'dayofyear');
+
+clf
+figure(1)
+subplot(2,1,1)
+% plot(mlml_tt.datetime(mlml_tt.fluorescence_qc_agg==1),movmean(mlml_tt.fluorescence(mlml_tt.fluorescence_qc_agg==1),12*24,1,"omitmissing"))
+% hold on
 % plot(mlml_chl.datetime,mlml_chl.fluorescence)
+% plot(mlml_chl.dayOfYear(1:365),mlml_chl.nanmedian_fluorescence(1:365))
+% hold on
+% plot(mlml_chl.dayOfYear(mlml_chl.datetime.Year==2020),mlml_chl.anomaly(mlml_chl.datetime.Year==2020))
+yyaxis left
+shade_anomaly(HABs_SantaCruzWharf.dayOfYear(HABs_SantaCruzWharf.datetime.Year==2020),HABs_SantaCruzWharf.anomaly_Avg_Chloro(HABs_SantaCruzWharf.datetime.Year==2020),'#cc78c9','#9a45f5')
+ylim([-5 90])
+hold on
+ylabel(['Moss Landing Marine Lab',newline,' 2020 Chlorophyll-a Anomaly',newline,'[mg/m^3]'],'FontSize',14)
+
+yyaxis right
+shade_anomaly(mlml_chl.dayOfYear(mlml_chl.datetime.Year==2020),mlml_chl.anomaly(mlml_chl.datetime.Year==2020))
+ylim([-5 90])
+
+set(gca, 'XTick', 1:30:365, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+xlim([0 366])
+datetick('x','keeplimits')
+hold on
+ylabel(['CalHABMap Weekly Chlorophyll-a Anomaly',newline,'[mg/m^3]'])
+
+% fill([shade_start, shade_start, shade_end, shade_end], ...
+%      [min(ylim) * 1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1], ...
+%      [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); % Adjust 'FaceAlpha' for transparency
+
+% grid off
+set(gcf,'Position',[0 0 1400 800])
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\shore_stations\mlml_and_calhabmap_chl.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\shore_stations\mlml_and_calhabmap_chl.pdf"]);
+end
+
+%% Plot climatology and anomaly
+
+plotClimatology(mlml_chl(mlml_chl.datetime.Year ~= 2020,:),'fluorescence')
+
+
+
+
 %%
 
 joined_tt=synchronize(ifcb_bray_tt,mlml_tt,'first','nearest');

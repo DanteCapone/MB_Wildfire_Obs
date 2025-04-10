@@ -1,0 +1,2701 @@
+%% Analysis for Paper Combined
+
+
+%% Add paths
+
+%Project
+addpath(genpath('Q:\Dante\Wildfire_Obs'));
+
+%Data
+addpath(genpath('Q:\Dante\data\MB_Wildfire_Obs\processed_data'));
+addpath('Q:\Dante\data\MB_Wildfire_Obs\aeronet')
+addpath('Q:\Dante\data\satellite_chl_CCE\shadow\chl\')
+
+
+%% Load data
+
+%I. Wildfire Aerosols
+%Aeronet
+load('Q:\Dante\data\MB_Wildfire_Obs\aeronet\monterey_lvl_1.5.mat')
+
+% Load PM2.5 dataset
+load('Q:\Dante\data\MB_Wildfire_Obs\pm2_5\sc_pm2.5_daily_all.mat')
+% Santa Cruz
+sc_pm2_5_daily_sc=sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName=="Santa Cruz",:);
+% % SLV Middle
+sc_pm2_5_daily_slv=sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName=="San Lorenzo Valley Middle School",:);
+
+% MERRA-2 averaged for the monterey Bay
+load('merra_MB_bc_avg_daily_plt.mat')
+
+% II. Chlorophyll
+
+%satellite
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\satellite\new_climatologies_anomalies\MB_satellite_climatologies_struct.mat')
+load('satellite_chl_MB_5day_climatology_data.mat')
+
+
+%HABS
+load('Q:\Dante\data\MB_Wildfire_Obs\shore_stations\habs_scwharf.mat')
+HABs_SantaCruzWharf.weekofyear=week(HABs_SantaCruzWharf.datetime,'weekofyear');
+HABs_SantaCruzWharf_clean = HABs_SantaCruzWharf(HABs_SantaCruzWharf.Avg_Chloro < 50, :);
+
+%Shore station
+load('Q:\Dante\data\MB_Wildfire_Obs\shore_stations\mlml_station_daily.mat')
+
+
+% III. IFCB
+
+% Taxonomy
+load('ifcb_ucsc_all_mean.mat')
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat')
+
+
+% IV. Physical Data
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+
+
+%% Set plotting specs
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plots
+
+
+% Dates
+
+lag_days = 6;
+start_date = datetime(2020, 8, 16);
+end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+august_date = datetime(2020, 9, 5);
+czu_date=datetime(2020, 8, 21);
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+%By week
+start_date_week = week(start_date, 'weekofyear');
+end_date_week = week(end_date, 'weekofyear');
+lag_date_week = week(lag_date, 'weekofyear');
+august_date_week = week(august_date, 'weekofyear');
+czu_date_week = week(czu_date, 'weekofyear');
+
+
+% By 5-day window
+% Each 5-day window starts at day 1, 6, 11, 16, ..., so we divide by 5 and round up
+start_date_5day = ceil(start_date_day / 5);
+end_date_5day = ceil(end_date_day / 5);
+lag_date_5day = ceil(lag_date_day / 5);
+august_date_5day = ceil(august_date_day / 5);
+czu_date_5day = ceil(czu_date_day / 5);
+
+%Years
+start_year=2016;
+end_year=2023;
+
+
+%For shading
+
+shade_start= start_date;
+shade_end= end_date;
+
+
+shade_start_day = start_date_day;
+shade_end_day = end_date_day;
+
+shade_start_5day = start_date_5day;
+shade_end_5day = end_date_5day;
+
+shade_start_week = start_date_week;
+shade_end_week = end_date_week;
+
+HABs_SantaCruzWharf_clean = HABs_SantaCruzWharf(HABs_SantaCruzWharf.Avg_Chloro < 50, :);
+
+%% I. Wildfire Aerosols Analysis
+%Select fire  years to exlcude
+fire_years=[2008, 2016,2020,2021];
+
+legend_on = 0;
+num_subplots = 3;
+saving=0;
+colorz = [
+    0.75, 0.1, 0;        % Darker shade of Red
+    0.3333, 0.6588, 0.4078;  % Green
+    0.1882, 0.2784, 0.7;        % Blue
+    0.7882, 0.4588, 0.9216   % Pastel Purple
+];
+
+ftsz=8;
+linewdt=1;
+
+% Plot
+close all;
+figure()
+
+% PM 2.5 Plot
+subplot(num_subplots, 1, 1)
+yyaxis left;
+plot(sc_pm2_5_daily_slv.dayOfYear(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+    sc_pm2_5_daily_slv.pm2_5(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+    'Color', colorz(3,:), 'LineStyle', '-', 'LineWidth', linewdt);
+hold on;
+%Add shading
+plot(sc_pm2_5_daily_sc.dayOfYear(sc_pm2_5_daily_sc.datetime.Year == 2020), ...
+    sc_pm2_5_daily_sc.pm2_5(sc_pm2_5_daily_sc.datetime.Year == 2020), ...
+    'Color', colorz(2,:), 'LineStyle', '-', 'LineWidth', linewdt);
+ylim([0 400])
+ylabel(["PM 2.5 (\mu g m ^{-3})"], 'FontSize', ftsz, 'FontName', ftname);
+
+yyaxis right;
+plotClimatology5day(sc_pm2_5_daily_slv(sc_pm2_5_daily_slv.datetime.Year ~= 2020, :), 'pm2_5')
+alpha(0.5)
+ylim([0 30])
+xlim([1 365])
+hold on;
+ylabel(["Average PM 2.5 (\mu g m^{-3})"], 'FontSize', ftsz, 'FontName', ftname);
+
+%Add shading
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+ax = gca;
+ax.FontSize = ftsz-1;
+ax.FontName = ftname;
+ax.XTickLabelRotation=45;
+if legend_on == 1
+    legend({'Climatology', '2020'}, 'FontSize', ftsz, 'FontName', ftname,'Location','northwest')
+end
+
+% Add "a)" label
+text(-0.1, 1.2, 'c', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+
+% AOD Plot
+subplot(num_subplots, 1, 2)
+yyaxis left;
+plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020), ...
+    Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020), ...
+    'Color', colorz(1,:), 'LineStyle', '-', 'LineWidth', 1);
+hold on
+
+ylabel('AOD 500nm', 'FontSize', ftsz, 'FontName', ftname);
+xlim([0 365])
+
+yyaxis right;
+plotClimatology5day(Monterey_lvl_1_5(~ismember(Monterey_lvl_1_5.datetime.Year, fire_years), :), 'AOD_500nm')
+alpha(0.1)
+ylim([0 0.2])
+xlim([1 365])
+hold on;
+%Add shading
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+
+ax = gca;
+ax.FontSize = ftsz-1;
+ax.FontName = ftname;
+ax.XTickLabelRotation=45;
+
+if legend_on == 1
+    legend({'Climatology (2003-present)', '2020'}, 'FontSize', ftsz, 'FontName', ftname)
+end
+ax = gca;
+ax.FontSize = ftsz-1;
+ax.FontName = ftname;
+
+% Add "b)" label
+text(-0.1, 1.2, 'd', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+
+% Black Carbon Mass Plot
+subplot(num_subplots, 1, 3)
+
+yyaxis left;
+plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020), ...
+    merra_bc_plt.Median_BCCMASS(merra_bc_plt.datetime.Year == 2020), ...
+    'Color', colorz(4,:), 'LineStyle', '-', 'LineWidth', linewdt);
+ylabel(["Black Carbon" + newline + "Concentration (µg m^{-2})"], 'FontSize', ftsz, 'FontName', ftname);
+hold on
+
+
+
+yyaxis right;
+plotClimatology5day(merra_bc_plt(~ismember(merra_bc_plt.datetime.Year, fire_years), :), 'Median_BCCMASS')
+ylabel(["Average Black Carbon" + newline + "Concentration (µg m^{-2})"], 'FontSize', ftsz, 'FontName', ftname);
+alpha(0.2)
+ylim([3e-7 12e-7])
+xlim([1 365])
+hold on;
+%Add shading
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+ax = gca;
+ax.FontSize = ftsz-1;
+ax.FontName = ftname;
+ax.XTickLabelRotation=45;
+
+
+
+if legend_on == 1
+    legend({'Climatology (2003-present)', '2020'}, 'FontSize', ftsz, 'FontName', ftname)
+end
+
+% Add "c)" label
+text(-0.1, 1.2, 'e', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 2.5, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_1_v0.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_1_v0.pdf');
+end
+saving = 0;
+
+
+
+
+%% II. Chlorophyll-a Analysis
+
+% Plot Satellite, CalHABMAP, and Fluorometer with Helvetica Font Size 10 and Adjusted Figure Dimensions
+
+close all;
+
+% Set publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for plotting
+
+% Fluorometer
+subplot(3,1,1);
+weekly_climatology(mlml_tt(mlml_tt.datetime.Year > 2017, :), 'fluorescence', 2);
+
+% ylabel('Average Chlorophyll mg m^{-3}', 'FontSize', ftsz, 'FontName', ftname);
+ylim([0 20]);
+hold on;
+mlml_tt_plt = retime(mlml_tt, 'weekly', 'mean');
+mlml_tt_plt.weekofyear = week(mlml_tt_plt.datetime, 'weekofyear');
+plot(mlml_tt_plt.weekofyear(mlml_tt_plt.datetime.Year == 2020), mlml_tt_plt.fluorescence(mlml_tt_plt.datetime.Year == 2020), ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', '#3e8a52');
+% ylabel('Chlorophyll mg m^{-3}', 'FontSize', ftsz, 'FontName', ftname);
+title('MLML Fluorometer', 'FontSize', ftsz, 'FontName', ftname);
+xline(start_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-','HandleVisibility', 'off');
+fill([shade_start_week, shade_start_week, shade_end_week, shade_end_week], ...
+    [min(ylim) * 4.5, max(ylim) * 1.5, max(ylim) * 1.5, min(ylim) * 4.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2,'HandleVisibility', 'off');
+xline(end_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(lag_date_week, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':','HandleVisibility', 'off');
+% xline(czu_date_week, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+ylim([0 20]);
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+
+% Add 'a' label to upper left of first plot
+annotation('textbox', [0.03, 0.91, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+
+
+
+% Add legend with only the included lines
+legend({'Climatology','2020'}, 'FontSize', ftsz, 'FontName', ftname, 'Location', 'northwest','AutoUpdate','off');
+
+
+
+% Shore Station Water Sample
+subplot(3,1,2);
+weekly_climatology(HABs_SantaCruzWharf_clean, 'Avg_Chloro', 2);
+hold on
+plot(HABs_SantaCruzWharf_clean.weekofyear(HABs_SantaCruzWharf_clean.datetime.Year == 2020), ...
+    HABs_SantaCruzWharf_clean.Avg_Chloro(HABs_SantaCruzWharf_clean.datetime.Year == 2020), ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', '#50e678','HandleVisibility','on');
+hold on
+% ylabel('Average Chlorophyll mg m^{-3}', 'FontSize', ftsz, 'FontName', ftname);
+ylim([-5 30]);
+xline(start_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-','HandleVisibility', 'off');
+fill([shade_start_week, shade_start_week, shade_end_week, shade_end_week], ...
+    [min(ylim) * 4.5, max(ylim) * 1.5, max(ylim) * 1.5, min(ylim) * 4.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2,'HandleVisibility', 'off');
+xline(end_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-','HandleVisibility', 'off');
+xline(lag_date_week, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':','HandleVisibility', 'off');
+
+xlim([1 52]);
+title('CalHABMAP Water Sample', 'FontSize', ftsz, 'FontName', ftname);
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+
+% Add legend with only the included lines
+% Explicitly define legend using plot handles
+legend({'Climatology', '2020'}, 'FontSize', ftsz, 'FontName', ftname, ...
+    'Location', 'northwest','AutoUpdate','off');
+
+% Add 'b' label to upper left of first plot
+annotation('textbox', [0.03, 0.62, 0.03, 0.05], 'String', '\bf{b}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+
+
+% Satellite
+
+% Make sure the file has columns like SYear, SDay, Mean for each time point
+filename = 'Q:\Dante\data\satellite_chl_CCE\shadow\chl\chl5d_EOF2shadow.csv';  % Path to the CSV file
+data_2020_shadow = readtable(filename);
+
+% filename = load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\satellite\new_climatologies_anomalies\MB_satellite_climatologies_struct.mat)';  % Path to the CSV file
+% data_2020 = readtable(filename);
+
+% Filter data for the year 2020
+data_2020_shadow = data_2020_shadow(data_2020_shadow.SYear == 2020, :);
+
+% Map the day of the year (SDay) to 5-day periods (1-73)
+dayOfYear_2020_shadow = data_2020_shadow.SDay;
+periodIndex_2020_shadow = ceil(dayOfYear_2020_shadow / 5);  % Convert day of the year to 5-day periods
+
+%Now full bay area
+filename = 'Q:\Dante\data\satellite_chl_CCE\shadow\chl\chl5d_MBarea.csv';  % Path to the CSV file
+data_2020_fullbay = readtable(filename);
+
+% filename = load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\satellite\new_climatologies_anomalies\MB_satellite_climatologies_struct.mat)';  % Path to the CSV file
+% data_2020 = readtable(filename);
+
+% Filter data for the year 2020
+data_2020_fullbay = data_2020_fullbay(data_2020_fullbay.SYear == 2020, :);
+
+% Map the day of the year (SDay) to 5-day periods (1-73)
+dayOfYear_2020_fullbay = data_2020_fullbay.SDay;
+periodIndex_2020_fullbay = ceil(dayOfYear_2020_fullbay / 5);  % Convert day of the year to 5-day periods
+
+
+%Satellite
+subplot(3,1,3);
+month_labs = {'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'};
+xvals = 1:73;
+
+% Fill area (excluded from legend using HandleVisibility = 'off')
+fill([xvals, fliplr(xvals)], ...
+     [MB_satellite_climatologies_struct.EOF2shadow.d5.Mean' + MB_satellite_climatologies_struct.EOF2shadow.d5.CI95', ...
+      fliplr(MB_satellite_climatologies_struct.EOF2shadow.d5.Mean' - MB_satellite_climatologies_struct.EOF2shadow.d5.CI95')], ...
+      'k', 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+
+hold on;
+
+% Plot the first line (included in the legend)
+plot(xvals, MB_satellite_climatologies_struct.EOF2shadow.d5.Mean, '-', 'LineWidth', linewdt, 'Color', '#979da6');
+
+hold on;
+
+% Configure axes
+xlim([0 73]);
+ylim([0 25]);
+set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs);
+grid on;
+
+% Plot other lines (included in the legend)
+plot(periodIndex_2020_shadow, data_2020_shadow.Mean, '-', 'Color', '#66b398', 'LineWidth', linewdt);
+hold on;
+plot(periodIndex_2020_fullbay, data_2020_fullbay.Mean, '-', 'Color', '#6c84bd', 'LineWidth', linewdt);
+
+% Exclude xlines from legend
+xline(lag_date_5day, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':', 'HandleVisibility', 'off');
+xline(start_date_5day, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', '-', 'HandleVisibility', 'off');
+fill([shade_start_5day, shade_start_5day, shade_end_5day, shade_end_5day], ...
+    [min(ylim) * 4.5, max(ylim) * 1.5, max(ylim) * 1.5, min(ylim) * 4.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off');
+xline(end_date_5day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-', 'HandleVisibility', 'off');
+
+% Add title and format axes
+title('Satellite', 'FontSize', ftsz, 'FontName', ftname);
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Add legend with only the included lines
+legend({'Climatology','Shadow', 'Full Bay'}, 'FontSize', ftsz, 'FontName', ftname, 'Location', 'northwest','AutoUpdate','off');
+
+% Add 'c' label to upper left of 3rd plot
+annotation('textbox', [0.03, 0.3, 0.03, 0.05], 'String', '\bf{c}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+
+% Create an invisible axis for the shared label (for yyaxis left)
+han_left = axes(gcf, 'visible', 'off');
+han_left.YLabel.Visible = 'on';
+
+% Move the left y-axis label further to the left by adjusting 'Position' property
+ylabel(han_left, 'Chlorophyll-a mg m^{-3}', 'FontSize', ftsz+2, 'FontName', ftname, 'FontWeight', 'bold');
+
+% Create an invisible axis for the shared label (for yyaxis left)
+han_bottom = axes(gcf, 'visible', 'off');
+han_bottom.XLabel.Visible = 'on';
+
+% Move the bottom y-axis label further to the bottom by adjusting 'Position' property
+xlabel(han_bottom, 'Month', 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+set(get(han_bottom, 'XLabel'), 'Position', [0.5, -0.09, 0], 'VerticalAlignment', 'bottom');
+
+
+% Set figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % 7.16 inches width and height to maintain aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save figure with the required font and size for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_2_v0.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_2_v0.pdf');
+end
+saving = 0;
+
+
+%% III. Morphometric Analysis 
+%% Calculate necessary Climatologies
+
+load('ifcb_nass_morpho_all_2016_2023.mat')
+
+ifcb_nass_morpho_nass_climatology=climatology_se(ifcb_nass_morpho_2016_2023,'MeanSlopeAbundance','week');
+ifcb_biov_morpho_nass_climatology=climatology_se(ifcb_nass_morpho_2016_2023,'MeanBiomassSum','week');
+
+%Add week for joining
+ifcb_nass_morpho_2016_2023.week=week(ifcb_nass_morpho_2016_2023.datetime,'weekofyear');
+
+%Join
+ifcb_nass_morpho_2016_2023_join=join(ifcb_nass_morpho_2016_2023,ifcb_biov_morpho_nass_climatology,'Keys',{'week'});
+ifcb_nass_morpho_2016_2023_join.anomaly_biovolumesum=ifcb_nass_morpho_2016_2023_join.MeanBiomassSum-ifcb_nass_morpho_2016_2023_join.MeanBiomassSum_climatology;
+
+ifcb_nass_morpho_2016_2023_join=join(ifcb_nass_morpho_2016_2023_join,ifcb_nass_morpho_nass_climatology,'Keys',{'week'});
+
+
+%% Compute Size Class Proportions
+% Add new columns to the DataFrame
+ifcb_nass_morpho_2016_2023.SumBinBiovolume1_2 = ifcb_nass_morpho_2016_2023.BinBiovolume1 + ifcb_nass_morpho_2016_2023.BinBiovolume2;
+ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 = ifcb_nass_morpho_2016_2023.BinBiovolume3 + ifcb_nass_morpho_2016_2023.BinBiovolume4;
+ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6 = ifcb_nass_morpho_2016_2023.BinBiovolume5 + ifcb_nass_morpho_2016_2023.BinBiovolume6;
+
+% Calculate total sum for each row
+ifcb_nass_morpho_2016_2023.TotalSum = ifcb_nass_morpho_2016_2023.SumBinBiovolume1_2 + ...
+                                      ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 + ...
+                                      ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6;
+
+% Calculate proportions
+ifcb_nass_morpho_2016_2023.PropBinBiovolume1_2 = ifcb_nass_morpho_2016_2023.SumBinBiovolume1_2 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+ifcb_nass_morpho_2016_2023.PropBinBiovolume3_4 = ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+ifcb_nass_morpho_2016_2023.PropBinBiovolume5_6 = ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+
+% Extract data for the year 2020
+year_filter = (ifcb_nass_morpho_2016_2023.datetime.Year == 2020);
+dayofyear_2020 = ifcb_nass_morpho_2016_2023.dayofyear(year_filter);
+
+% Extract the proportions for the year 2020
+prop1_2_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume1_2(year_filter);
+prop3_4_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume3_4(year_filter);
+prop5_6_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume5_6(year_filter);
+
+% Generate a full range of days for the year 2020
+full_dayofyear = (min(dayofyear_2020):max(dayofyear_2020))';
+
+% Replace Inf values with NaN in the proportions before interpolation
+prop1_2_2020(prop1_2_2020 == Inf) = NaN;
+prop3_4_2020(prop3_4_2020 == Inf) = NaN;
+prop5_6_2020(prop5_6_2020 == Inf) = NaN;
+
+% Interpolate missing data (NaN values are automatically handled by interp1)
+interp_prop1_2 = interp1(dayofyear_2020, prop1_2_2020, full_dayofyear, 'linear', 'extrap');
+interp_prop3_4 = interp1(dayofyear_2020, prop3_4_2020, full_dayofyear, 'linear', 'extrap');
+interp_prop5_6 = interp1(dayofyear_2020, prop5_6_2020, full_dayofyear, 'linear', 'extrap');
+
+% Prepare interpolated data for the stacked bar plot
+interpolated_proportions_2020 = [interp_prop1_2, interp_prop3_4, interp_prop5_6];
+
+
+
+%% New groupings
+% Add new columns to the DataFrame
+ifcb_nass_morpho_2016_2023.SumBinBiovolume1 = ifcb_nass_morpho_2016_2023.BinBiovolume1;
+ifcb_nass_morpho_2016_2023.SumBinBiovolume2 = ifcb_nass_morpho_2016_2023.BinBiovolume2;
+ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 = ifcb_nass_morpho_2016_2023.BinBiovolume3 + ifcb_nass_morpho_2016_2023.BinBiovolume4;
+ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6 = ifcb_nass_morpho_2016_2023.BinBiovolume5 + ifcb_nass_morpho_2016_2023.BinBiovolume6;
+
+% Calculate total sum for each row
+ifcb_nass_morpho_2016_2023.TotalSum = ifcb_nass_morpho_2016_2023.SumBinBiovolume1 + ...
+                                      ifcb_nass_morpho_2016_2023.SumBinBiovolume2 + ...
+                                      ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 + ...
+                                      ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6;
+
+% Calculate proportions
+ifcb_nass_morpho_2016_2023.PropBinBiovolume1 = ifcb_nass_morpho_2016_2023.SumBinBiovolume1 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+ifcb_nass_morpho_2016_2023.PropBinBiovolume2 = ifcb_nass_morpho_2016_2023.SumBinBiovolume2 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+ifcb_nass_morpho_2016_2023.PropBinBiovolume3_4 = ifcb_nass_morpho_2016_2023.SumBinBiovolume3_4 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+ifcb_nass_morpho_2016_2023.PropBinBiovolume5_6 = ifcb_nass_morpho_2016_2023.SumBinBiovolume5_6 ./ ifcb_nass_morpho_2016_2023.TotalSum;
+
+% Extract data for the year 2020
+year_filter = (ifcb_nass_morpho_2016_2023.datetime.Year == 2020);
+dayofyear_2020 = ifcb_nass_morpho_2016_2023.dayofyear(year_filter);
+
+% Extract the proportions for the year 2020
+prop1_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume1(year_filter);
+prop2_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume2(year_filter);
+prop3_4_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume3_4(year_filter);
+prop5_6_2020 = ifcb_nass_morpho_2016_2023.PropBinBiovolume5_6(year_filter);
+
+% Generate a full range of days for the year 2020
+full_dayofyear = (min(dayofyear_2020):max(dayofyear_2020))';
+
+% Interpolate missing data
+interp_prop1 = interp1(dayofyear_2020, prop1_2020, full_dayofyear, 'linear', 'extrap');
+interp_prop2 = interp1(dayofyear_2020, prop2_2020, full_dayofyear, 'linear', 'extrap');
+interp_prop3_4 = interp1(dayofyear_2020, prop3_4_2020, full_dayofyear, 'linear', 'extrap');
+interp_prop5_6 = interp1(dayofyear_2020, prop5_6_2020, full_dayofyear, 'linear', 'extrap');
+
+% Prepare interpolated data for the stacked bar plot
+interpolated_proportions_2020 = [interp_prop1, interp_prop2, interp_prop3_4, interp_prop5_6];
+
+%% New groupings for Abundance
+% Add new columns for summed abundance bins (similar to how it's done for Biovolume)
+ifcb_nass_morpho_2016_2023.SumBinAbundance1 = ifcb_nass_morpho_2016_2023.BinAbundance1;
+ifcb_nass_morpho_2016_2023.SumBinAbundance2 = ifcb_nass_morpho_2016_2023.BinAbundance2;
+ifcb_nass_morpho_2016_2023.SumBinAbundance3_4 = ifcb_nass_morpho_2016_2023.BinAbundance3 + ifcb_nass_morpho_2016_2023.BinAbundance4;
+ifcb_nass_morpho_2016_2023.SumBinAbundance5_6 = ifcb_nass_morpho_2016_2023.BinAbundance5 + ifcb_nass_morpho_2016_2023.BinAbundance6;
+
+% Calculate total sum for each row (for abundance)
+ifcb_nass_morpho_2016_2023.TotalSumAbundance = ifcb_nass_morpho_2016_2023.SumBinAbundance1 + ...
+                                               ifcb_nass_morpho_2016_2023.SumBinAbundance2 + ...
+                                               ifcb_nass_morpho_2016_2023.SumBinAbundance3_4 + ...
+                                               ifcb_nass_morpho_2016_2023.SumBinAbundance5_6;
+
+% Calculate proportions (for abundance)
+ifcb_nass_morpho_2016_2023.PropBinAbundance1 = ifcb_nass_morpho_2016_2023.SumBinAbundance1 ./ ifcb_nass_morpho_2016_2023.TotalSumAbundance;
+ifcb_nass_morpho_2016_2023.PropBinAbundance2 = ifcb_nass_morpho_2016_2023.SumBinAbundance2 ./ ifcb_nass_morpho_2016_2023.TotalSumAbundance;
+ifcb_nass_morpho_2016_2023.PropBinAbundance3_4 = ifcb_nass_morpho_2016_2023.SumBinAbundance3_4 ./ ifcb_nass_morpho_2016_2023.TotalSumAbundance;
+ifcb_nass_morpho_2016_2023.PropBinAbundance5_6 = ifcb_nass_morpho_2016_2023.SumBinAbundance5_6 ./ ifcb_nass_morpho_2016_2023.TotalSumAbundance;
+
+%Extract abundance data for the year 2020
+year_filter = (ifcb_nass_morpho_2016_2023.datetime.Year == 2020);
+dayofyear_2020_abundance = ifcb_nass_morpho_2016_2023.dayofyear(year_filter);
+
+% Extract the abundance proportions for the year 2020
+prop1_abundance_2020 = ifcb_nass_morpho_2016_2023.PropBinAbundance1(year_filter);
+prop2_abundance_2020 = ifcb_nass_morpho_2016_2023.PropBinAbundance2(year_filter);
+prop3_4_abundance_2020 = ifcb_nass_morpho_2016_2023.PropBinAbundance3_4(year_filter);
+prop5_6_abundance_2020 = ifcb_nass_morpho_2016_2023.PropBinAbundance5_6(year_filter);
+
+% Generate a full range of days for the year 2020 (same as biovolume)
+full_dayofyear_abundance = (min(dayofyear_2020_abundance):max(dayofyear_2020_abundance))';
+
+% Interpolate missing abundance data
+interp_prop1_abundance = interp1(dayofyear_2020_abundance, prop1_abundance_2020, full_dayofyear_abundance, 'linear', 'extrap');
+interp_prop2_abundance = interp1(dayofyear_2020_abundance, prop2_abundance_2020, full_dayofyear_abundance, 'linear', 'extrap');
+interp_prop3_4_abundance = interp1(dayofyear_2020_abundance, prop3_4_abundance_2020, full_dayofyear_abundance, 'linear', 'extrap');
+interp_prop5_6_abundance = interp1(dayofyear_2020_abundance, prop5_6_abundance_2020, full_dayofyear_abundance, 'linear', 'extrap');
+
+% Prepare interpolated data for the stacked bar plot (abundance)
+interpolated_abundance_proportions_2020 = [interp_prop1_abundance, interp_prop2_abundance, interp_prop3_4_abundance, interp_prop5_6_abundance];
+
+
+%% Final Plot for the 2020 window with 5 day moving mean window
+load('ifcb_nass_morpho_part1_1_2016_2023.mat')
+
+% Bin edges and legend labels
+% Define Bin Widths for ESD
+bin_min = 15;
+bin_max = 150;
+
+num_bins = 7;
+
+% Generate logarithmically spaced bin edges
+binEdges_esd = round(logspace(log10(bin_min), log10(bin_max), num_bins));
+
+% Update bin labels with adjusted upper bounds and rounded values
+binLabels = cell(1, length(binEdges_esd)-1);
+for i = 1:length(binEdges_esd)-1
+    if i < length(binEdges_esd)-1
+        % All bins except the last: [e1, e2 - 0.1], rounded
+        lower_bound = round(binEdges_esd(i));
+        upper_bound = round(binEdges_esd(i+1) - 1);
+        binLabels{i} = sprintf('%d - %d', lower_bound, upper_bound);
+    else
+        % Last bin: [en-1, en], rounded
+        lower_bound = round(binEdges_esd(i));
+        upper_bound = round(binEdges_esd(i+1));
+        binLabels{i} = sprintf('%d - %d', lower_bound, upper_bound);
+    end
+end
+
+
+start_date = datetime(2016, 5, 1);
+end_date = datetime(2023, 12, 1);
+start_date_doy=day(start_date,'dayofyear');
+end_date_doy=day(end_date,'dayofyear');
+
+peak_fire = datetime(2020,8,21);
+lag_days = 6;
+start_date = datetime(2020, 8, 16);
+end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+august_date = datetime(2020, 9, 11);
+
+% Define days and datenum variables for shading
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+peak_fire_day = day(peak_fire, 'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+% For shading
+shade_start_day = start_date_day;
+shade_end_day = end_date_day;
+
+% Set up publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for plotting
+
+
+
+% Setup tiled layout
+num_subplots = 5;
+t = tiledlayout(num_subplots, 1, 'TileSpacing', 'Compact', 'Padding', 'Compact');
+
+% Define custom colors for the plot
+colors_for_plot = {'#8bade8','#e69e5c','#73bd86'};
+
+% Define a contrasting color palette
+colors = [
+    0.0000, 0.4470, 0.7410;  % Bright Blue
+    0.8500, 0.3250, 0.0980;  % Bright Red
+    0.9290, 0.6940, 0.1250;  % Bright Yellow
+    0.4940, 0.1840, 0.5560;  % Purple
+    0.4660, 0.6740, 0.1880;  % Bright Green
+    0.3010, 0.7450, 0.9330;  % Cyan
+    0.6350, 0.0780, 0.1840;  % Dark Red
+    1.0000, 0.0000, 0.0000;  % Pure Red
+    0.0000, 1.0000, 0.0000;  % Pure Green
+    1.0000, 0.0000, 1.0000;  % Magenta
+    0.0000, 1.0000, 1.0000;  % Bright Cyan
+    1.0000, 1.0000, 0.0000;  % Bright Yellow
+];
+
+
+close all
+
+% List of subplot letters
+subplot_labels = {'a', 'b', 'c', 'd', 'e'};
+
+% Setup tiled layout
+tiledlayout(num_subplots, 1, 'TileSpacing', 'Compact', 'Padding', 'Compact')
+
+
+% Plot 1: Size-class proportions
+nexttile
+hBar = bar(full_dayofyear, interpolated_proportions_2020, 'stacked', 'BarWidth', 1.1);
+hold on
+colors_short = [0.0000, 0.4470, 0.7410;  % Bright Blue
+            0.8500, 0.3250, 0.0980;  % Bright Red
+          0.8509, 0.5922, 0.9098;
+          0.7373, 0.8824, 0.4941];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = colors_short(k, :);
+end
+hold on
+% Add shaded area to the plot and add lines for 8 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+ylabel(["Proportion" + newline + "Total Biovolume"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+legend({'15-21 \mum','22-32 \mum','33-69 \mum','70-150 \mum'}, 'Location', 'bestoutside', 'FontSize', ftsz, 'AutoUpdate', 'off');
+ylim([0 1])
+xlim([start_date_doy end_date_doy])
+
+% Set common x-axis properties
+% xticks(xticks_days)
+datetick('x','mmm','keeplimits')
+
+text(-0.08, 1.25, subplot_labels{1}, 'Units', 'normalized', 'FontSize', 10, ...
+     'FontName', ftname, 'FontWeight', 'bold', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+
+
+%Plot 2: Total Biovolume Anomaly
+nexttile
+%Multiply by 1000 to convert to um^3/L
+conversion_factor=1e9;
+conversion_factor=1;
+shade_anomaly(movmean(ifcb_nass_morpho_2016_2023_join.dayofyear(year_filter),5), conversion_factor*movmean(ifcb_nass_morpho_2016_2023_join.anomaly_biovolumesum(year_filter),5))
+% plot(movmean(ifcb_nass_morpho_2016_2023_join.dayofyear(year_filter),5), movmean(ifcb_nass_morpho_2016_2023_join.anomaly_biovolumesum(year_filter),5), ...
+% '-','LineWidth', 1.5, 'Color', '#979da6');
+hold on
+
+% Add shaded area to the plot and add lines for 8 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+yline(0, '--k', 'LineWidth', 1);
+ylabel(["Biovolume" + newline + "(\mum^3 L^{-1})"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+
+% Set common x-axis properties
+datetick('x','mmm','keeplimits')
+xlim([start_date_doy end_date_doy])
+ylim([-1.5e7*conversion_factor 3e7*conversion_factor])
+
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+text(-0.08, 1.25, subplot_labels{2}, 'Units', 'normalized', 'FontSize', 10, ...
+     'FontName', ftname, 'FontWeight', 'bold', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+
+
+
+
+
+
+
+% Plot 2: Total Sized Biovolume
+nexttile
+year_filter = (ifcb_nass_morpho_2016_2023.datetime.Year == 2020);
+% yyaxis left
+for i = 8:13
+        %Multiply by 1000 to convert to mm^3/L
+        conversion_factor=1e9;
+        conversion_factor=1;
+        plot(ifcb_nass_morpho_2016_2023.dayofyear(year_filter), conversion_factor*ifcb_nass_morpho_2016_2023{year_filter, i}, '-', ...
+            'LineWidth', 1.5, 'Color', colors(i-7, :));
+        ylim([0 4e7*conversion_factor])
+        hold on
+        ylabel(["Sized Biovolume" + newline + "(\mum^3 L^{-1})"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+
+end
+legend(binLabels, 'Location', 'bestoutside', 'FontSize', ftsz-1, 'NumColumns', 1, ...
+       'AutoUpdate', 'off');
+title(legend, 'Size class [\mum]');
+
+% Add shaded area to the plot and add lines for 6 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':');
+
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+
+
+xlim([start_date_doy end_date_doy])
+
+% Set common x-axis properties
+% xticks(xticks_days)
+datetick('x','mmm','keeplimits')
+
+text(-0.08, 1.25, subplot_labels{3}, 'Units', 'normalized', 'FontSize', 10, ...
+     'FontName', ftname, 'FontWeight', 'bold', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+
+
+
+% Plot 3: Total Sized Abundance
+nexttile
+year_filter = (ifcb_nass_morpho_part1_1_2016_2023.datetime.Year == 2020);
+
+for i = 14:19
+    if i==14
+        ax = gca; % Get current axes
+        yyaxis left 
+        %Multiply by 1000 to convert to /L
+        plot(ifcb_nass_morpho_part1_1_2016_2023.dayofyear(year_filter), (ifcb_nass_morpho_part1_1_2016_2023{year_filter, i})*1000, '-', ...
+            'LineWidth', 1.5, 'Color', colors(i-13, :));
+        hold on
+        ylabel(["cells L^{-1}" + newline + "(15-21 \mum)"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold','Color', 'k');
+        ylim([0 2e6])
+        fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+        [min(ylim) * 2, max(ylim) * 2, max(ylim) * 2 min(ylim) * 2], ...
+        [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+        ax.YColor = 'k'; % Set left y-axis tick labels and axis color to black
+
+    else 
+        yyaxis right
+        ylabel(["cells L^{-1}" + newline + "(>21 \mum)"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold','Color', 'k');
+        plot(ifcb_nass_morpho_part1_1_2016_2023.dayofyear(year_filter), (ifcb_nass_morpho_part1_1_2016_2023{year_filter, i})*1000, '-', ...
+            'LineWidth', 1.5, 'Color', colors(i-13, :));
+        ylim([0 5e5])
+        ax.YColor = 'k'; % Set left y-axis tick labels and axis color to black
+
+    end
+
+    hold on
+end
+legend(binLabels, 'Location', 'bestoutside', 'FontSize', ftsz, 'AutoUpdate', 'off');
+title(legend, 'Size class [\mum]');
+legend('hide')
+
+% Add shaded area to the plot and add lines for 8 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+
+xlim([start_date_doy end_date_doy])
+datetick('x','mmm','keeplimits')
+
+text(-0.08, 1.25, subplot_labels{4}, 'Units', 'normalized', 'FontSize', 10, ...
+     'FontName', ftname, 'FontWeight', 'bold', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+
+
+% Plot 4: NASS
+nexttile
+plot(ifcb_nass_morpho_2016_2023.dayofyear(year_filter), real(ifcb_nass_morpho_2016_2023.MeanSlopeAbundance(year_filter)), ...
+    '-','LineWidth', 1.5, 'Color', colors_for_plot{1});
+hold on
+
+%Plot climatology from previous datatable
+climatology_plot=(ifcb_nass_morpho_2016_2023_join(:,{'dayofyear';'MeanSlopeAbundance_climatology';'StandardError_MeanSlopeAbundance'}));
+
+% Find unique rows based on 'MeanBiomassSum_climatology' column
+[~, uniqueIdx] = unique(climatology_plot.MeanSlopeAbundance_climatology);
+
+% Select only the unique rows
+climatology_plot = climatology_plot(uniqueIdx, :);
+climatology_plot = sortrows(climatology_plot,"dayofyear","ascend");
+plot(climatology_plot.dayofyear, climatology_plot.MeanSlopeAbundance_climatology, 'LineWidth', 1.5, 'Color', '#979da6');
+ci95 = 1.96 * climatology_plot.StandardError_MeanSlopeAbundance;
+fill([climatology_plot.dayofyear; flipud(climatology_plot.dayofyear)], ...
+    [climatology_plot.MeanSlopeAbundance_climatology + ci95; flipud(climatology_plot.MeanSlopeAbundance_climatology - ci95)], ...
+    'k', 'FaceAlpha', 0.15, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+ylabel(['NASS'], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+legend({'2020','Climatology'}, 'Location', 'bestoutside','FontSize', ftsz, 'AutoUpdate', 'off');
+ylim([-5 0])
+
+% Add shaded area to the plot and add lines for 8 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+hold on
+line_dates = [day(datetime(2020, 8, 16), 'dayofyear'), day(datetime(2020, 9, 22), 'dayofyear')];
+line_heights = [max(ylim), max(ylim)];
+bar(line_dates, line_heights, 'BarWidth', 0.005, 'FaceColor', 'k', 'EdgeColor', 'none');
+
+
+xlim([start_date_doy end_date_doy])
+
+% Set common x-axis properties
+% xticks(xticks_days)
+datetick('x','mmm','keeplimits')
+
+text(-0.08, 1.25, subplot_labels{5}, 'Units', 'normalized', 'FontSize', 10, ...
+     'FontName', ftname, 'FontWeight', 'bold', 'VerticalAlignment', 'top', 'HorizontalAlignment', 'left');
+
+
+
+
+% Set figure size and save options
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % Adjusted figure size
+set(gcf, 'PaperUnits', 'inches', 'PaperPosition', [0, 0, 5, 6]);  % Match paper size exactly
+set(gcf, 'PaperPositionMode', 'auto');  % Auto-scale to ensure full fit
+
+% Saving the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_3_v0.png', '-dpng', '-r1200');
+    print(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_3_v0.pdf', '-dpdf', '-r1200');
+end
+
+%% Abundance porporitons
+% Add a new plot using the abundance data (similar to the final tile but for abundance)
+% Continue using the tiled layout from the previous code
+close all
+figure
+% Setup tiled layout
+t = tiledlayout(2, 1, 'TileSpacing', 'Compact', 'Padding', 'Compact'); % Increase the number of subplots by 1
+
+% (Insert the existing plots here, if necessary, before the new one)
+
+% Plot 6: Size-class proportions using Abundance
+nexttile
+hBarAbundance = bar(full_dayofyear, fillmissing(interpolated_abundance_proportions_2020,"linear"), 'stacked', 'BarWidth', 1.1);
+hold on
+% Define the colors for the bars
+colors_abundance = [0.0000, 0.4470, 0.7410;  % Bright Blue
+                    0.8500, 0.3250, 0.0980;  % Bright Red
+                    0.8509, 0.5922, 0.9098;  % Light Purple
+                    0.7373, 0.8824, 0.4941]; % Light Green
+for k = 1:length(hBarAbundance)
+    hBarAbundance(k).FaceColor = colors_abundance(k, :);
+end
+
+% Add the same shading and fire smoke indicators
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', ':'); 
+% xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':'); 
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Set ylabel and other formatting for abundance
+ylabel(["Proportion" + newline + "Total Abundance"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+legend({'15-22 \mum','22-32 \mum','33-69 \mum','70-150 \mum'}, 'Location', 'bestoutside');
+ylim([0 1])
+xlim([start_date_doy end_date_doy])
+
+% Set common x-axis properties
+datetick('x','mmm','keeplimits')
+
+nexttile
+hBar = bar(full_dayofyear, interpolated_proportions_2020, 'stacked', 'BarWidth', 1.1);
+hold on
+colors = [0.0000, 0.4470, 0.7410;  % Bright Blue
+            0.8500, 0.3250, 0.0980;  % Bright Red
+          0.8509, 0.5922, 0.9098;
+          0.7373, 0.8824, 0.4941];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = colors(k, :);
+end
+% line_dates = [day(datetime(2020, 8, 18), 'dayofyear'), day(datetime(2020, 9, 22), 'dayofyear')];
+% line_heights = [1, 1];
+% bar(line_dates, line_heights, 'BarWidth', 0.005, 'FaceColor', 'k', 'EdgeColor', 'none');
+hold on
+% Add shaded area to the plot and add lines for 8 day lag and August Fire Smoke
+xline(peak_fire_day, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':'); 
+% xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':'); 
+% xline(august_date_day, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [min(ylim) * 1.5, max(ylim) * 1.5, max(ylim) * 1.5 min(ylim) * 1.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2, 'HandleVisibility', 'off'); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+ylabel(["Proportion" + newline + "Total Biovolume"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+legend({'15-22 \mum','22-32 \mum','33-69 \mum','70-150 \mum'}, 'Location', 'bestoutside');
+ylim([0 1])
+xlim([start_date_doy end_date_doy])
+
+% Set common x-axis properties
+% xticks(xticks_days)
+datetick('x','mmm','keeplimits')
+
+% Format figure size for dual or single monitor use (same as earlier)
+dual_monitor=0;
+if dual_monitor == 1
+    set(gcf, 'Position', [0 1100 1400 600])
+else
+    set(gcf, 'Position', [0 100 1400 600])
+end
+
+% Saving the figure
+saving=1;
+if saving == 1
+    saveas(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\morphometrics_proportions_plots.png');
+    saveas(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\morphometrics_proportions_plots.pdf');
+end
+
+%% IV. Taxanomic Changes
+
+%% Cross corraltion and significance testing
+% Parameters for significance thresholding
+numtests = 5000;  % Increased number of permutations for better p-value estimation
+alpha = 0.05;  % Significance level
+
+% Initialize containers for results for all taxa
+all_taxa = {};
+all_max_correlations = [];
+all_max_lags = [];
+all_p_values = [];
+all_adjusted_p_values = [];
+
+% Loop through each taxon
+for i = 1:size(taxa_data, 2)
+    % Get the current taxon data and PM2.5 data (after filling missing values)
+    series1 = ifcb_pm25{:, taxa{i}};
+    series2 = fillmissing(pm25, 'linear');
+    
+    % Compute the actual cross-correlation over the full lag range
+    [cc, lags] = xcorr(series1, series2, 'coeff');
+    
+    % Filter to keep only lags between -10 and 30 (window of interest)
+    lag_filter = (lags >= -10) & (lags <= 30);
+    filtered_cc = cc(lag_filter);
+    filtered_lags = lags(lag_filter);
+    
+    % Find the maximum cross-correlation and corresponding lag within the window of interest
+    [max_cc, max_idx] = max(abs(filtered_cc));
+    max_lag = filtered_lags(max_idx);
+    
+    % Perform random permutations using Fourier surrogate method (across all lags)
+    max_rand_ccs = zeros(numtests, 1);
+    for test = 1:numtests
+        rand_series1 = generate_fourier_surrogate(series1);  % Generate Fourier surrogate for series1
+        
+        % Compute cross-correlation across all lags
+        [xc_rand, ~] = xcorr(rand_series1, series2, 'coeff');
+        
+        % Now filter to keep only lags between -10 and 30 (same window of interest)
+        rand_filtered_cc = xc_rand(lag_filter);
+        
+        % Store the maximum cross-correlation from the window of interest
+        max_rand_ccs(test) = max(abs(rand_filtered_cc));
+    end
+
+    % Dynamic threshold based on the 95th percentile of null distribution
+    dynamic_threshold = prctile(max_rand_ccs, 95);
+
+    % Calculate p-value as the proportion of random max cross-correlations that exceeded the observed max
+    tolerance = 1e-5;
+    p_value = mean(max_rand_ccs >= (max_cc - tolerance));
+    
+    % Apply a small minimum threshold to avoid p-value = 0
+    p_value = max(p_value, 1 / numtests);  % Ensure p-value is not exactly 0
+
+    % Save the results for all taxa, whether significant or not
+    all_taxa = [all_taxa, taxa{i}];  % Save taxon name
+    all_max_correlations = [all_max_correlations, max_cc];  % Save max correlation
+    all_max_lags = [all_max_lags, max_lag];  % Save corresponding lag
+    all_p_values = [all_p_values, p_value];  % Save non-adjusted p-value
+end
+
+
+
+%% Now apply Benjamini-Hochberg FDR correction to all p-values
+[sorted_p_values, sort_idx] = sort(all_p_values);  % Sort p-values in ascending order
+num_taxa = length(all_p_values);  % Total number of taxa
+
+% Adjust the p-values according to the Benjamini-Hochberg procedure
+adjusted_p_values = sorted_p_values .* num_taxa ./ (1:num_taxa);
+adjusted_p_values(adjusted_p_values > 1) = 1;  % Ensure adjusted p-values do not exceed 1
+
+% Re-map the adjusted p-values back to their original order
+unsorted_adjusted_p_values = zeros(size(all_p_values));
+unsorted_adjusted_p_values(sort_idx) = adjusted_p_values;  % Remap sorted p-values to original order
+all_adjusted_p_values = unsorted_adjusted_p_values;  % Store the adjusted p-values for all taxa
+
+% Prepare the output with significance markings
+taxa_with_marks = all_taxa;  % Copy of taxa names
+for i = 1:num_taxa
+    % Mark taxa with significant non-adjusted p-value
+    if all_p_values(i) < alpha
+        taxa_with_marks{i} = [taxa_with_marks{i}, '*'];  % Add * to the taxon name
+    end
+    % Mark taxa with significant adjusted p-value
+    if all_adjusted_p_values(i) < alpha
+        taxa_with_marks{i} = [taxa_with_marks{i}, '*'];  % Add ** to the taxon name
+    end
+end
+
+% Round the p-values and max CC to 3 decimal places
+rounded_p_values = round(all_p_values, 3);
+rounded_adjusted_p_values = round(all_adjusted_p_values, 3);
+rounded_max_correlations = round(all_max_correlations, 3);
+
+% Create a table with the columns: taxa, max CC, lag, non-adjusted p-value, adjusted p-value
+results_table = table(taxa_with_marks', rounded_max_correlations', all_max_lags', rounded_p_values', rounded_adjusted_p_values', ...
+    'VariableNames', {'Taxa', 'Max_CC', 'Lag', 'P_value', 'Adjusted_p_value'});
+
+% Sort the table by Max_CC in descending order
+sorted_results_table = sortrows(results_table, 'Max_CC', 'descend');
+
+% Save the sorted table to a CSV file
+csv_filename = 'all_taxa_with_p_values.csv';
+writetable(sorted_results_table, csv_filename);
+
+% Display the sorted table to the user
+disp('Results saved to all_taxa_with_p_values.csv');
+disp(sorted_results_table);
+
+% Plot the null distribution of maximum cross-correlations for visualization
+figure;
+histogram(all_max_rand_ccs, 30);
+hold on;
+xline(dynamic_threshold, 'r', 'Threshold (95th percentile)');
+title('Null Distribution of Max Cross-Correlations');
+xlabel('Max Cross-Correlation (Null)');
+ylabel('Frequency');
+legend('Random Surrogate CCs', 'Threshold');
+hold off;
+
+
+%% Now all taxa for plotting
+numtests = 5000;  % Increased number of permutations for better p-value estimation
+alpha = 0.05;  % Significance level
+
+% Initialize containers for significant results
+significant_taxa = {};
+significant_p_values = [];
+significant_max_correlations = [];
+significant_max_lags = [];
+all_max_rand_ccs = [];  % Store all random max cross-correlations for thresholding
+
+% Store cross-correlation values for the heatmap
+all_cc = [];  % Will store cross-correlation values for all taxa
+all_lags = lags;  % Store all possible lags (shared across taxa)
+significant_mask = zeros(length(all_lags), size(taxa_data, 2));  % Initialize mask for significant values
+
+% Loop through each taxon
+for i = 1:size(taxa_data, 2)
+    % Get the current taxon data and PM2.5 data (after filling missing values)
+    series1 = ifcb_pm25{:, taxa{i}};
+    series2 = fillmissing(pm25, 'linear');
+    
+    % Compute the actual cross-correlation over the full lag range
+    [cc, lags] = xcorr(series1, series2, 'coeff');
+    
+    % Store the cross-correlation values for this taxon
+    all_cc(:, i) = cc;  % Add to all cross-correlation values for the heatmap
+    
+    % Filter to keep only lags between -10 and 30 (window of interest)
+    lag_filter = (lags >= -10) & (lags <= 30);
+    filtered_cc = cc(lag_filter);
+    filtered_lags = lags(lag_filter);
+    
+    % Find the maximum cross-correlation and corresponding lag within the window of interest
+    [max_cc, max_idx] = max(abs(filtered_cc));
+    max_lag = filtered_lags(max_idx);
+    
+    % Perform random permutations using Fourier surrogate method (across all lags)
+    max_rand_ccs = zeros(numtests, 1);
+    for test = 1:numtests
+        rand_series1 = generate_fourier_surrogate(series1);  % Generate Fourier surrogate for series1
+        
+        % Compute cross-correlation across all lags
+        [xc_rand, ~] = xcorr(rand_series1, series2, 'coeff');
+        
+        % Now filter to keep only lags between -10 and 30 (same window of interest)
+        rand_filtered_cc = xc_rand(lag_filter);
+        
+        % Store the maximum cross-correlation from the window of interest
+        max_rand_ccs(test) = max(abs(rand_filtered_cc));
+    end
+    all_max_rand_ccs = [all_max_rand_ccs; max_rand_ccs];  % Collect max values from all tests
+
+    % Dynamic threshold based on the 95th percentile of null distribution
+    dynamic_threshold = prctile(max_rand_ccs, 95);
+    
+    % Only consider the taxon if its max CC exceeds the dynamic threshold
+    if max_cc > dynamic_threshold
+        % Calculate p-value as the proportion of random max cross-correlations that exceeded the observed max
+        tolerance = 1e-5;
+        p_value = mean(max_rand_ccs >= (max_cc - tolerance));
+        
+        % Apply a small minimum threshold to avoid p-value = 0
+        p_value = max(p_value, 1 / numtests);  % Ensure p-value is not exactly 0
+        
+        % Check if the p-value is significant
+        if p_value < alpha
+            % Mark the cross-correlation as significant in the mask
+            significant_mask(lag_filter, i) = (abs(filtered_cc) > dynamic_threshold);  % Mark * for significant points
+        end
+    end
+end
+
+
+%% Absolute Abundance-select taxa
+% --- Filter Taxa based on Significant Adjusted P-values and CC >= 0.6 --- %
+
+% Load the previous table with significant taxa
+taxa_table_p_vals = readtable('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\tables\all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = taxa_table_p_vals.Taxa;
+max_cc_values = taxa_table_p_vals.Max_CC;  % Extract the max cross-correlation coefficients
+
+% Filter taxa with max CC >= 0.6 and keep only those
+valid_taxa = significant_taxa(max_cc_values >= 0.6);  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 7, 1);
+end_date = datetime(2020, 11, 1);
+shade_start_date = datetime(2020, 8, 16);
+shade_end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+
+czu_date = datetime(2020, 8, 21);
+august_date = datetime(2020, 9, 11);
+shade_start = datetime(2020, 8, 16);
+shade_end = datetime(2020, 9, 22);
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+original_colors = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7   % Medium gray (for "Other Taxa")
+
+];
+
+% Add manually specified contrasting colors
+additional_colors = [
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    0.3, 0.7, 0.3;  % Deep Green
+];
+
+% Combine original and additional colors into a full colormap
+extended_color_map = [original_colors; additional_colors(1:(17-length(original_colors)), :)];
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2020, 7, 1) datetime(2020, 11, 1)]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 3]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+% Create the legend with all entries
+h = legend(legend_labels, 'Location', 'bestoutside', 'AutoUpdate', 'off', ...
+    'FontSize', ftsz, 'FontName', ftname);
+
+% Add 'a' label to upper left of first plot
+% annotation('textbox', [0.03, 0.91, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+5, 'FontName', ftname, 'LineStyle', 'none');
+
+% Modify labels explicitly (italicize all except the 2nd and last)
+modified_labels = legend_labels;
+for i = 1:length(modified_labels)
+    if i == 2 || i == length(modified_labels)
+        % Non-italic explicitly
+        modified_labels{i} = ['\rm ', legend_labels{i}];
+    else
+        % Italic explicitly
+        modified_labels{i} = ['\it ', legend_labels{i}];
+    end
+end
+
+% Create legend with interpreter enabled
+h = legend(hBar, modified_labels, 'Location', 'bestoutside', ...
+           'FontSize', ftsz, 'FontName', ftname, 'Interpreter', 'tex');
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    % Save as PNG
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.png');
+    
+    % Save as PDF
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.pdf');
+end
+
+%% Combined Heatmap and PDF Plots Side-by-Side
+close all;
+
+subplot_labels = {'\bf{b}','\bf{c}','\bf{d}','\bf{e}','\bf{f}','\bf{g}','\bf{h}'};
+
+italic_taxa = {
+    'Akashiwo', 'Asterionellopsis','Boreadinium', 'Ceratium','Chaetoceros', ...
+    'Cochlodinium', 'Corethron', 'Cyl Nitz', ...
+    'Det Cer Lau', 'Dictyocha', 'Dinophysis', ...
+    'Ditylum', 'Entomoneis', 'Eucampia', ...
+    'Gymnodinium','Gyrodinium', 'Hemiaulus', 'Leptocylindrus', ...
+    'Peridinium','Phaeocystis', 'Polykrikos','Protocentrum','Protoperidinium', 'Pseudo nitzschia', ...
+    'Pyramimonas','Skeletonema', 'Thalassionema', 'Thalassiosira', ...
+    'Tiarina', 'Tontonia', 'Torodinium', ...
+    'Tropidoneis', 'Vicicitus'
+};
+
+
+
+ftsz = 8;
+figure('Units', 'inches', 'Position', [0, 0, 5, 6]);
+
+% --- Left plot: Heatmap using imagesc --- %
+subplot('Position', [0.22, 0.12, 0.42, 0.8]);  % Wider and aligned with PDFs
+
+imagesc(lags, 1:numel(taxa), data);
+colormap(jet);
+caxis([0, 0.8]);
+xlim([0 15]);
+
+% Taxa label formatting
+taxa_clean = strrep(taxa, '_', ' ');
+set(gca, 'YTick', 1:numel(taxa_clean));
+set(gca, 'YTickLabel', taxa_clean);
+
+% Italicize only taxa in italic_taxa
+set(gca, 'TickLabelInterpreter', 'tex');  % Switch from LaTeX back to default interpreter
+yticklabels = taxa_clean;
+
+for i = 1:numel(taxa_clean)
+    base_name = strrep(taxa_clean{i}, '*', '');
+    
+    if ismember(base_name, italic_taxa)
+        yticklabels{i} = ['\it ', taxa_clean{i}];  % TeX-style italics
+    end
+end
+
+set(gca, 'YTick', 1:numel(taxa_clean));
+set(gca, 'YTickLabel', yticklabels);
+set(gca, 'TickLabelInterpreter', 'tex');  % Use TeX, which respects \it
+set(gca, 'FontName', ftname);  % Restore your figure's font
+set(gca, 'FontSize', ftsz);  % Restore your figure's font
+
+
+% Axes styling
+ax = gca;
+ax.YAxis.FontSize = ftsz;
+ax.YAxis.FontName = ftname;
+ax.XAxis.FontSize = ftsz;
+ax.XAxis.FontName = ftname;
+ax.XTick = lags;
+ax.XTickLabelRotation = 0;
+ax.XTickLabels=CustomXLabels;
+xlabel('Lag (days after PM 2.5 anomaly)', 'FontSize', ftsz, 'FontName', ftname);
+
+% Top colorbar aligned with left plot
+cb = colorbar('Location', 'northoutside');
+cb.Position = [0.21, 0.93, 0.42, 0.015];
+cb.FontSize = ftsz;
+cb.FontName = ftname;
+
+cb.Label.String = '\it Cross correlation';  % Bold italic C
+cb.Label.FontSize = ftsz;
+cb.Label.FontName = ftname;
+cb.Label.Interpreter = 'tex';  % Use TeX for bold/italic formatting
+cb.Label.Rotation = 0;         % Keep horizontal
+cb.Label.HorizontalAlignment = 'center';
+cb.Label.VerticalAlignment = 'middle';
+
+% Shift label to the right of the colorbar
+% cb.Label.Position(1) = cb.Position(1) + cb.Position(3) + 0.1;  % x + width + small offset
+cb.Label.Position(2) = cb.Position(2)*4.5;    % slightly above vertical center
+
+% Subplot label 'a'
+annotation('textbox', [0.08, 0.92, 0.03, 0.05], ...
+           'String', '\bf{a}', ...
+           'FontSize', ftsz + 2, ...
+           'FontName', ftname, ...
+           'LineStyle', 'none', ...
+           'VerticalAlignment', 'bottom');
+
+
+% --- Right plot: PDFs --- %
+num_taxa = numel(unique_taxa);
+subplot_height = 0.8 / num_taxa;
+
+for ii = 1:num_taxa
+    subplot('Position', [0.68, 0.12 + (num_taxa - ii)*subplot_height, 0.2, subplot_height - 0.01]);
+
+    % Density for full dataset
+    data_full = log10(ifcbbray_dates_filt.(unique_taxa{ii}));
+    data_full = data_full(~isnan(data_full) & ~isinf(data_full));
+    [f_full, x_full] = ksdensity(data_full);
+    plot(x_full, f_full, 'LineWidth', 2, 'Color', 'black'); hold on;
+    area(x_full, f_full, 'FaceColor', 'black', 'FaceAlpha', 0.5);
+
+    % Density for windowed subset
+    data_window = log10(ifcb_2020_sel.(unique_taxa{ii}));
+    data_window = data_window(~isnan(data_window) & ~isinf(data_window));
+    [f_window, x_window] = ksdensity(data_window);
+    plot(x_window, f_window, 'LineWidth', 2, 'Color', colorz(ii, :));
+    area(x_window, f_window, 'FaceColor', colorz(ii, :), 'FaceAlpha', 0.7);
+
+    xlim([-2 8]);
+    ylim([0 0.9]);
+    yticks([0.3, 0.7]);
+
+    % Only add x-label to bottom plot
+    if ii == num_taxa
+        xlabel('Log_{10} cells L^{-1}', ...
+               'FontSize', ftsz, ...
+               'FontName', ftname);
+    else
+        set(gca, 'XTickLabel', []);  % Remove x-tick labels
+    end
+
+    % Taxa name (top-left inside plot)
+    x_text = min(xlim) + 0.02 * range(xlim);
+    y_text = min(ylim) + 0.95 * range(ylim);
+    if ismember(unique_taxa{ii}, italic_taxa)
+        text(x_text, y_text, unique_taxa{ii}, ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'FontAngle', 'italic', ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    else
+        text(x_text, y_text, unique_taxa{ii}, ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    end
+
+    % Subplot label (outside top-left)
+    pos = get(gca, 'Position');
+    annotation('textbox', [pos(1) - 0.04, pos(2) + pos(4) - 0.005, 0.03, 0.03], ...
+               'String', subplot_labels{ii}, ...
+               'FontWeight', 'bold', ...
+               'FontSize', ftsz + 2, ...
+               'FontName', ftname, ...
+               'LineStyle', 'none', ...
+               'VerticalAlignment', 'top');
+
+    % Axes formatting
+    ax = gca;
+    ax.FontSize = ftsz;
+    ax.FontName = ftname;
+    ax.XAxisLocation = 'bottom';
+    ax.XTickLabelRotation = 0;
+    ax.XDir = 'normal';
+    ax.YAxisLocation = 'right';
+end
+
+% --- Shared y-axis label on right --- %
+han = axes(gcf, 'Visible', 'off', 'Position', [0.98, 0.14, 0.01, 0.76]);
+han.YLabel.Visible = 'on';
+ylabel(han, shared_y_label, ...
+       'FontWeight','bold', ...
+       'FontSize', ftsz, ...
+       'FontName', ftname, ...
+       'Rotation', -90, ...
+       'HorizontalAlignment', 'center', ...
+       'VerticalAlignment', 'bottom');
+
+% Export options
+set(gcf, 'PaperPositionMode', 'auto');
+
+saving=0;
+if saving==1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v1.png");
+    print(gcf, '-dpdf', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v1.pdf");
+end
+
+
+%% V. Assemblage Comparison
+
+%% VI. Physical Drivers
+
+
+%% VII. Supplemental
+close all
+
+%% Figure S1: Chlorophyll EOF shadow
+
+% Define the base file path for Chlorophyll data
+base_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl\';
+
+% Define the range of years
+years = 2008:2023;
+
+% Coordinate calculations
+maxX = 307; % Maximum x index for chlorophyll data
+maxY = 318; % Maximum y index for chlorophyll data
+
+[x, y] = meshgrid(0:maxX, 0:maxY);
+lon = -122.68085 + 0.003290 * x;
+lat = 37.180664 - 0.002701 * y;
+
+% Define bounds for subsetting (example bounds, adjust as needed)
+latBounds = [36.3219, 37.180664]; % latitude range
+lonBounds = [-122.68085, -121.6675]; % longitude range
+
+subsetMask = (lat >= latBounds(1) & lat <= latBounds(2)) & ...
+             (lon >= lonBounds(1) & lon <= lonBounds(2));
+
+% Prepare matrix for EOF analysis
+chlDataMatrix = [];
+
+for year = years
+    year_path = fullfile(base_path, num2str(year));
+    
+    % Get all subfolders starting with 'C' and containing 'chl_5day'
+    subfolders = dir(fullfile(year_path, 'C*chl_5day*'));
+    
+    for subfolder = subfolders'
+        data_path = fullfile(subfolder.folder, subfolder.name);
+        
+        % List all HDF files in the sub-directory
+        files = dir(fullfile(data_path, '*.hdf'));
+        % Extract the names
+        fileNames = {files.name};
+
+        % Sort files by the numeric part of the name which represents the date
+        [~, idx] = sort(str2double(regexp(fileNames, '\d+', 'match', 'once')));
+        fileNames = fileNames(idx)';
+        
+        for f = 1:length(fileNames)
+            fullFilePath = fullfile(data_path, fileNames{f});
+            info = hdfinfo(fullFilePath);
+            dataSetName = info.SDS(1).Name;
+            data = hdfread(fullFilePath, dataSetName); % Specify dataset name
+
+            % Correct for the signed byte issue
+            data = int16(data);  % Convert data to a 16-bit integer to handle negative values correctly
+            negativeIndices = data < 0;
+            data(negativeIndices) = data(negativeIndices) + 256;
+
+            % Filter invalid data
+            data(data < 2 | data > 254) = NaN; % Excludes invalid pixel values
+            data(data == 0) = NaN; % Represents no data
+            data(data == 1) = NaN; % Coastline, excluded from analysis
+            data(data == 255) = NaN; % Invalid data (land/clouds), excluded from analysis
+
+            % Convert pixel values to Chlorophyll concentration
+            chlConcentration = 10.^(0.015 * double(data) - 2.0);
+            chlConcentration = chlConcentration(subsetMask);
+
+            % Flatten the 2D subset data and append as a new column in the matrix
+            chlDataMatrix = [chlDataMatrix, chlConcentration(:)];
+        end
+    end
+end
+
+% Remove rows with any NaN values (as they represent invalid data)
+chlDataMatrix = chlDataMatrix(~any(isnan(chlDataMatrix), 2), :);
+
+% Calculate EOFs using SVD
+% Step 1: Calculate the mean of each row and subtract it from the matrix
+chlMean = mean(chlDataMatrix, 2);
+anomalies = chlDataMatrix - chlMean;
+
+% Step 2: Perform SVD on the anomaly matrix
+[U, S, V] = svd(anomalies, 'econ');
+
+% The EOFs are the left singular vectors (columns of U)
+EOFs = U;
+singularValues = diag(S);
+explainedVariance = (singularValues .^ 2) / sum(singularValues .^ 2) * 100;
+
+% Display the results
+disp('EOFs calculated successfully.');
+disp('Explained variance by each EOF:');
+disp(explainedVariance(1:10));
+
+%% Plot the first 2 EOFs in space alongside the mask
+close all; figure;
+
+for i = 1:3
+    subplot(3, 1, i);
+    %Apply masks for upwelling shadows, experiment with which seem most
+    %viable
+    eofMap = NaN(size(subsetMask));
+    eofMap(subsetMask) = EOFs(:, i);    
+    imagesc(lon(1,:), lat(:,1), eofMap);
+
+    titleText = sprintf('EOF %d (%.2f%% variance explained)', i, explainedVariance(i));
+    title(titleText);    shading interp;
+    colormap jet;
+    colorbar;
+
+    if i == 3  % Apply mask for EOF 2
+        eofMap = NaN(size(subsetMask));
+        eofMap(subsetMask) = EOFs(:, i-1);
+        mask = eofMap > 8e-3;           % Create mask for EOF 2 where values are greater than 10
+        eofMap(~mask) = 0;          % Set values outside the mask to NaN
+        eofMap(mask) = 1;          % Set values outside the mask to NaN
+
+        imagesc(lon(1,:), lat(:,1), eofMap);
+
+        title('EOF 2 Upwelling Shadow Mask');
+        shading interp;
+        colormap parula;
+        colorbar;
+
+    end
+
+
+    xlabel('Longitude (°)');
+    ylabel('Latitude (°)');
+    set(gca, 'YDir', 'normal');
+end
+
+% sgtitle('Monterey Bay Chlorophyll 5-day EOFS (1-9)')
+% Set figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16-4.5, 6]);  % 7.16 inches width and height to maintain aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+% Save figure with the required font and size for publication
+
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_2_v0_pt2_eof.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_2_v0_pt2_eof.pdf');
+end
+saving = 0;
+
+
+%% Figure S3: HABS Taxa and Correlation with Biovolume
+% Ensure datetime columns are formatted correctly
+HABs_SantaCruzWharf_clean.datetime = datetime(HABs_SantaCruzWharf_clean.datetime, 'Format', 'yyyy-MM-dd');
+ifcb_nass_morpho_2016_2023.datetime = datetime(ifcb_nass_morpho_2016_2023.datetime, 'Format', 'yyyy-MM-dd');
+
+% Define date range (April - December 2020)
+start_date = datetime(2020, 4, 1);
+end_date = datetime(2020, 12, 31);
+
+% Filter only 2020 data
+mask_HABs_2020 = year(HABs_SantaCruzWharf_clean.datetime) == 2020;
+mask_IFCB_2020 = year(ifcb_nass_morpho_2016_2023.datetime) == 2020;
+
+% Merge by nearest datetime
+[~, idx] = min(abs(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020) - ...
+                   ifcb_nass_morpho_2016_2023.datetime(mask_IFCB_2020)'), [], 2);
+HAB_vals = HABs_SantaCruzWharf_clean.Avg_Chloro(mask_HABs_2020);
+IFCB_vals = ifcb_nass_morpho_2016_2023.TotalSum(mask_IFCB_2020);
+merged_data = table(HAB_vals, IFCB_vals(idx), 'VariableNames', {'Avg_Chloro', 'TotalSum'});
+% Compute correlation coefficient (r), R², and p-value
+valid_idx = ~isnan(merged_data.Avg_Chloro) & ~isnan(merged_data.TotalSum);
+[r, p] = corr(merged_data.Avg_Chloro(valid_idx), merged_data.TotalSum(valid_idx), 'Rows', 'complete');
+r_squared = r^2;
+
+
+
+% Filter only 2020 data
+mask_HABs_2020 = year(HABs_SantaCruzWharf_clean.datetime) == 2020;
+mask_IFCB_2020 = year(ifcb_nass_morpho_2016_2023.datetime) == 2020;
+
+%% Create figure with 3 subplots
+
+%Add shading
+start_date = datetime(2020, 8, 16);
+end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+
+figure;
+
+% **Subplot 1: HAB Species Abundances**
+close all
+tiledlayout(2,2, 'TileSpacing', 'Compact', 'Padding', 'Compact')
+nexttile
+hold on;
+
+% Define colors
+color_Alexandrium = '#50e678';  % Green
+color_Dinophysis = '#cf572b';   % Orange-Red
+color_PseudoNitzschia = '#1f77b4'; % Blue
+
+% Plot Alexandrium spp.
+p1=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), HABs_SantaCruzWharf_clean.Alexandrium_spp(mask_HABs_2020), ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Alexandrium, ...
+    'DisplayName', '\it{Alexandrium} spp.');
+
+% Plot Dinophysis spp.
+p2=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), ...
+    HABs_SantaCruzWharf_clean.Dinophysis_spp(mask_HABs_2020), ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Dinophysis, ...
+    'DisplayName', '\it{Dinophysis} spp.');
+% Plot Pseudo-nitzschia seriata group
+p3=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), HABs_SantaCruzWharf_clean.Pseudo_nitzschia_seriata_group(mask_HABs_2020), ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_PseudoNitzschia, ...
+    'DisplayName', '\it{Pseudo-nitzschia seriata} group');
+
+% Add vertical reference lines
+xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+
+% Shaded region
+fill([shade_start, shade_start, shade_end, shade_end], ...
+    [min(ylim)*0.6, max(ylim) * 2, max(ylim) * 2, min(ylim)*0.6], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+
+
+ylim([0 0.9e5]);
+% Set labels and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Set axes properties
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+ax.XTick = datetime(2020, 1, 1):calmonths(1):datetime(2020, 12, 31); % Tick marks every 2 weeks
+ax.XTickLabelRotation=45;
+% ylim([0, 7e1]);  % Scale Y-axis for better visualization
+
+% Add legend with italicized text and turn off auto-update
+lgd = legend([p1, p2, p3], ...
+    {'\it{Alexandrium}', '\it{Dinophysis}', '\it{PN. seriata}'}, ...
+    'Orientation', 'horizontal', ...
+    'FontSize', ftsz - 1, ...
+    'NumColumns', 3, ...
+    'Location', 'southoutside');
+
+% Shrink line length in legend entries
+lgd.ItemTokenSize = [8, 10];  % [length, height]
+text(-0.15, 1.04, 'a', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
+
+
+% **Subplot 2: Chlorophyll & Biovolume Time Series**
+nexttile
+hold on;
+
+% Left y-axis for Avg Chlorophyll (Blue)
+yyaxis left;
+plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), ...
+    HABs_SantaCruzWharf_clean.Avg_Chloro(mask_HABs_2020), ...
+    'LineStyle', '-', 'LineWidth', 2, 'Color', '#5288de', ...
+    'DisplayName', 'Avg Chlorophyll');
+ylabel('Chlorophyll (mg m^{-3})', 'FontSize', ftsz, 'FontName', ftname);
+
+ylim([0 35]);
+
+% Add vertical reference lines
+xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+
+% Shaded region
+fill([shade_start, shade_start, shade_end, shade_end], ...
+    [min(ylim)*0.6, max(ylim) * 2, max(ylim) * 2, min(ylim)*0.6], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+
+% Right y-axis for TotalSum (Red)
+yyaxis right;
+plot(ifcb_nass_morpho_2016_2023.datetime(mask_IFCB_2020), ...
+    ifcb_nass_morpho_2016_2023.TotalSum(mask_IFCB_2020), ...
+    'LineStyle', '-', 'LineWidth', 2, 'Color', '#e36262', ...
+    'DisplayName', 'Biovolume');
+ylabel('Biovolume (\mum^3 L^{-1})', 'FontSize', ftsz, 'FontName', ftname);
+
+
+
+% Formatting
+ax1 = gca;
+ax1.XTick = datetime(2020,1,1):calmonths(1):datetime(2020,12,31);
+xlim([datetime(2020, 4, 1), datetime(2020, 12, 31)]); % Limit x-axis to April - December
+% legend('show', 'Location', 'bestoutside', 'FontSize', ftsz,'AutoUpdate','off');
+text(-0.15, 1.04, 'b', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
+hold off;
+
+
+% **Subplot 3: Chlorophyll vs. Biovolume Scatter Plot**
+nexttile
+hold on;
+
+% Scatter plot of Avg Chlorophyll vs. TotalSum from merged data
+scatter(merged_data.Avg_Chloro, merged_data.TotalSum, ...
+    50, 'filled', 'MarkerFaceColor', '#0072BD', 'MarkerEdgeColor', 'k');
+
+% Labels and title
+xlabel('Chlorophyll (mg ^{-3})', 'FontSize', 8, 'FontName', 'Arial');
+ylabel('Biovolume (\mum^3 L^{-1})', 'FontSize', 8, 'FontName', 'Arial');
+
+xlim([0 35]);
+ylim([0 4e7]);
+
+% Add R² and p-value annotation in the upper right
+x_lim = xlim;
+y_lim = ylim;
+text(x_lim(2) - 0.1 * range(x_lim), y_lim(2) - 0.15 * range(y_lim), ...
+     sprintf('R^2 = %.2f\np = %.3f', r_squared, p), ...
+     'FontSize', 8, 'FontWeight', 'normal', 'HorizontalAlignment', 'right');
+
+hold off;
+
+
+
+% Panel Label
+text(-0.15, 1.04, 'c', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
+hold off;
+
+% === Subplot 4: PAR-adjusted Ratio ===
+% ==== Compute PAR-adjusted Avg_Chloro : TotalSum ratio ====
+hab_time = HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020);
+avg_chl = HABs_SantaCruzWharf_clean.Avg_Chloro(mask_HABs_2020);
+
+ifcb_time = ifcb_nass_morpho_2016_2023.datetime(mask_IFCB_2020);
+cells = ifcb_nass_morpho_2016_2023.TotalSum(mask_IFCB_2020);
+
+phys_time = physical_forcings_biology_table.datetime;
+PAR = physical_forcings_biology_table.surface_downwelling_photosynthetic_photon_flux_in_air;
+par_mask = year(phys_time) == 2020;
+
+% Strip timezones
+hab_time.TimeZone = ''; ifcb_time.TimeZone = ''; phys_time.TimeZone = '';
+
+% Match Avg_Chloro to nearest TotalSum
+[~, idx_nearest_ifcb] = min(abs(hab_time - ifcb_time'), [], 2);
+matched_cells = cells(idx_nearest_ifcb);
+
+% Match Avg_Chloro to nearest PAR
+[~, idx_nearest_par] = min(abs(hab_time - phys_time(par_mask)'), [], 2);
+matched_PAR = PAR(par_mask);
+matched_PAR = matched_PAR(idx_nearest_par);
+
+% Filter valid
+valid_idx = ~isnan(avg_chl) & ~isnan(matched_cells) & ~isnan(matched_PAR);
+ratio = avg_chl(valid_idx) ./ matched_cells(valid_idx);
+dt_ratio = hab_time(valid_idx);
+PAR_ratio = matched_PAR(valid_idx);
+
+% Regress ratio ~ PAR
+lm = fitlm(PAR_ratio, ratio);
+residual_ratio = lm.Residuals.Raw;
+nexttile
+plot(dt_ratio, residual_ratio, 'Color', [0.1 0.6 0.1], 'LineWidth', 2);
+hold on
+% Add vertical reference lines
+xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+
+% Shaded region
+fill([shade_start, shade_start, shade_end, shade_end], ...
+    [min(ylim) * 0.6, max(ylim) * 2, max(ylim) * 2, min(ylim) * 0.6], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+
+% ylim([0 2]);
+
+ylabel('Chl-a: Biovolume','FontSize',ftsz);
+grid on;
+xlim([datetime(2020,4,1) datetime(2020,12,31)]);
+text(-0.15, 1.04, 'd', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
+
+% Set figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 4]);  % 7.16 inches width and height to maintain aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save figure
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\fig_s2_calhabmap.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\fig_s2_calhabmap.pdf');
+end
+saving = 0;
+
+%% Figure S. Shannon index of taxa
+% Ensure datetime column is formatted correctly
+ifcbbray.datetime = datetime(ifcbbray.datetime, 'Format', 'yyyy-MM-dd HH:mm:ss');
+
+% Extract species data (columns 2:52)
+species_data = ifcbbray{:, 2:52};  % Extract numerical values
+
+% Normalize data to compute relative abundances
+species_proportions = species_data ./ sum(species_data, 2, 'omitnan'); % Avoid division by zero
+
+% Compute Shannon Diversity Index (H') for each row
+ifcb_shannon = -sum(species_proportions .* log(species_proportions), 2, 'omitnan');
+
+% Define date ranges of interest
+date_ranges = [datetime(2018,6,1), datetime(2018,6,20);
+               datetime(2020,4,22), datetime(2020,5,5);
+               datetime(2020,8,16), datetime(2020,9,22)];
+
+% Initialize arrays to store max values
+max_values = zeros(size(date_ranges,1),1);
+max_dates = NaT(size(date_ranges,1),1);  % Corrected: Initialize with NaT instead of datetime
+
+% Find max Shannon Index in each date range
+for i = 1:size(date_ranges,1)
+    mask = (ifcbbray.datetime >= date_ranges(i,1)) & (ifcbbray.datetime <= date_ranges(i,2));
+    if any(mask)  % Ensure there's data in the range
+        [max_values(i), idx] = max(ifcb_shannon(mask));
+        valid_dates = ifcbbray.datetime(mask);
+        max_dates(i) = valid_dates(idx);
+    end
+end
+
+% Create figure
+figure;
+hold on;
+
+% Plot Shannon Diversity Index over time
+plot(ifcbbray.datetime, movmean(ifcb_shannon,1), ...
+    'LineStyle', '-', 'LineWidth', 2, 'Color', '#0072BD');
+
+% Labels and title
+xlabel('Date', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('Shannon Diversity Index (H'')', 'FontSize', ftsz, 'FontName', ftname);
+title('Shannon Diversity Index Over Time', 'FontSize', ftsz, 'FontName', ftname);
+
+% Annotate max values on the plot
+for i = 1:size(date_ranges,1)
+    if ~isnat(max_dates(i))  % Check if a valid date was found
+        text(max_dates(i), max_values(i), sprintf('%.2f', max_values(i)), ...
+            'FontSize', ftsz, 'FontWeight', 'bold', 'VerticalAlignment', 'bottom', ...
+            'HorizontalAlignment', 'center', 'BackgroundColor', 'w', 'EdgeColor', 'k');
+    end
+end
+
+% Format axes
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Set figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 6]);  
+set(gcf, 'PaperPositionMode', 'auto');  
+
+% Save figure with required font and size for publication
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_shannon.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_shannon.pdf');
+end
+saving = 0;
+
+hold off;
+
+
+
+
+%% 
+% Ensure datetime column is formatted correctly
+ifcbbray.datetime = datetime(ifcbbray.datetime, 'Format', 'yyyy-MM-dd HH:mm:ss');
+
+% Filter only 2020 data
+mask_HABs_2020 = year(ifcbbray.datetime) == 2020;
+ifcbbray_2020 = ifcbbray(mask_HABs_2020, :);
+
+% Define taxa groupings (0 = Dinoflagellate, 1 = Diatom, 2 = Other/Unclassified)
+grouping_vector = [0, 0, 0, 1, 0, ...  % Akashiwo to Boreadinium
+                   1, 0, 1, 2, 0, 0, 1, ...  % Centric to Corethron
+                   2, 1, 1, 2, 0, 1, 1, ...  % Cryptophyte to Entomoneis
+                   1, 2, 1, 0, 0, 1, 1, ...  % Eucampia to Leptocylindrus
+                   1, 0, 2, 2, 1, 1, 0, ...  % Licmophora to Peridinium
+                   2, 1, 0, 0, 0, 1, ...  % Phaeocystis to Pseudo_nitzschia
+                   2, 2, 0, 1, 1, 1, 2, ...  % Pyramimonas to Tiarina
+                   2, 2, 0, 1, 2];  % Tintinnid to Vicicitus + Column 53 (Unclassified)
+
+% Extract species data (columns 2 to 53)
+species_data = ifcbbray_2020{:, 2:52};
+
+% Sum taxa into three groups (merging Unclassified into Other)
+dinoflagellates = sum(species_data(:, grouping_vector == 0), 2, 'omitnan');
+diatoms = sum(species_data(:, grouping_vector == 1), 2, 'omitnan');
+other = sum(species_data(:, grouping_vector == 2), 2, 'omitnan') + species_data(:, end);  % Merge unclassified into other
+
+% Compute proportions
+total = dinoflagellates + diatoms + other;
+dinoflagellate_ratio = dinoflagellates ./ total;
+diatom_ratio = diatoms ./ total;
+other_ratio = other ./ total;
+
+% Handle NaN cases (e.g., where total is zero)
+dinoflagellate_ratio(isnan(dinoflagellate_ratio)) = 0;
+diatom_ratio(isnan(diatom_ratio)) = 0;
+other_ratio(isnan(other_ratio)) = 0;
+
+% Create new table with proportions
+ifcb_grouped_2020 = table(ifcbbray_2020.datetime, dinoflagellate_ratio, diatom_ratio, other_ratio, ...
+                          'VariableNames', {'datetime', 'Dinoflagellates', 'Diatoms', 'Other'});
+
+% Plot stacked bar chart for 2020
+figure;
+hold on;
+
+% Create stacked bar plot of proportions
+bar_handle = bar(ifcb_grouped_2020.datetime, ...
+    [ifcb_grouped_2020.Diatoms, ifcb_grouped_2020.Dinoflagellates, ifcb_grouped_2020.Other], 'stacked');  
+
+% Corrected color order
+bar_handle(1).FaceColor = '#3498DB';  % Diatoms (Blue)
+bar_handle(2).FaceColor = '#FF5733';  % Dinoflagellates (Orange)
+bar_handle(3).FaceColor = '#A9A9A9';  % Other (Gray, including Unclassified)
+
+% Labels and title
+xlabel('Date (2020)', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('Proportion', 'FontSize', ftsz, 'FontName', ftname);
+title('Proportional Abundance of Dinoflagellates, Diatoms, and Other (2020)', ...
+      'FontSize', ftsz, 'FontName', ftname);
+legend({'Diatoms', 'Dinoflagellates', 'Other'}, 'Location', 'northwest', 'FontSize', ftsz);
+
+% Format axes
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+ax.XTick = datetime(2020,1,1):calmonths(1):datetime(2020,12,31);  % Tick marks every month
+ax.XTickLabelRotation = 45;  % Rotate labels
+ylim([0, 1]);  % Proportion scale from 0 to 1
+
+% Set figure size for publication
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 6]);  
+set(gcf, 'PaperPositionMode', 'auto');
+
+% Save figure
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_dinovdiatom_other_2020.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_dinovdiatom_other_2020.pdf');
+end
+saving = 0;
+
+hold off;
+
+
+%% Diatom:Dino ratio
+% Ensure datetime column is formatted correctly
+ifcbbray.datetime = datetime(ifcbbray.datetime, 'Format', 'yyyy-MM-dd HH:mm:ss');
+
+% Define taxa groupings (0 = Dinoflagellate, 1 = Diatom, 2 = Other)
+grouping_vector = [0, 0, 0, 1, 0, ...  % Akashiwo to Boreadinium
+                   1, 0, 1, 2, 0, 0, 1, ...  % Centric to Corethron
+                   2, 1, 1, 2, 0, 1, 1, ...  % Cryptophyte to Entomoneis
+                   1, 2, 1, 0, 0, 1, 1, ...  % Eucampia to Leptocylindrus
+                   1, 0, 2, 2, 1, 1, 0, ...  % Licmophora to Peridinium
+                   2, 1, 0, 0, 0, 1, ...  % Phaeocystis to Pseudo_nitzschia
+                   2, 2, 0, 1, 1, 1, 2, ...  % Pyramimonas to Tiarina
+                   2, 2, 0, 1, 2];  % Tintinnid to Vicicitus
+
+% Extract species data (columns 2 to 52) - Ignore Unclassified (Col 53)
+species_data = ifcbbray{:, 2:52};
+
+% Sum taxa into three groups
+dinoflagellates = sum(species_data(:, grouping_vector == 0), 2, 'omitnan');
+diatoms = sum(species_data(:, grouping_vector == 1), 2, 'omitnan');
+other = sum(species_data(:, grouping_vector == 2), 2, 'omitnan');
+
+% Compute diatom-to-dinoflagellate ratio
+diatom_dino_ratio = diatoms ./ dinoflagellates;
+diatom_dino_ratio(isnan(diatom_dino_ratio) | isinf(diatom_dino_ratio)) = NaN; % Handle NaNs and Infs
+
+% Create new table with the ratio
+ifcb_ratio = table(ifcbbray.datetime, diatom_dino_ratio, other, ...
+                   'VariableNames', {'datetime', 'DiatomToDinoRatio', 'Other'});
+
+% Create figure
+figure;
+hold on;
+
+% Plot Diatom-to-Dinoflagellate Ratio
+plot(ifcb_ratio.datetime, movmean(ifcb_ratio.DiatomToDinoRatio, 7, 'omitnan'), ...
+    'LineStyle', '-', 'LineWidth', 2, 'Color', '#0072BD');
+
+% Labels and title
+xlabel('Date', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('Diatom-to-Dinoflagellate Ratio', 'FontSize', ftsz, 'FontName', ftname);
+title('Diatom-to-Dinoflagellate Ratio Over Time', 'FontSize', ftsz, 'FontName', ftname);
+
+% Format axes
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+ax.XTick = datetime(min(ifcb_ratio.datetime), 'Format', 'yyyy-MM-dd'):calmonths(6):datetime(max(ifcb_ratio.datetime), 'Format', 'yyyy-MM-dd');
+ax.XTickLabelRotation = 45;
+
+% Set figure size for publication
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 6]);  
+set(gcf, 'PaperPositionMode', 'auto');
+
+% Save figure
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_diatom_dino_ratio.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_diatom_dino_ratio.pdf');
+end
+saving = 0;
+
+hold off;
+
+
+%% Cross-Correlation: PM2.5 vs Chlorophyll-a
+close all
+% Use already loaded datasets
+
+% Extract PM2.5 data for San Lorenzo Valley Middle School
+sc_pm2_5_daily = sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName == "San Lorenzo Valley Middle School", :);
+sc_pm2_5_daily.datetime = datetime(sc_pm2_5_daily.datetime, 'TimeZone', 'UTC');
+if ~istimetable(sc_pm2_5_daily)
+    sc_pm2_5_daily = table2timetable(sc_pm2_5_daily, 'RowTimes', 'datetime');
+end
+
+% Convert chlorophyll datasets to timetables with UTC time zone if not already timetables
+mlml_tt.datetime = datetime(mlml_tt.datetime, 'TimeZone', 'UTC');
+if ~istimetable(mlml_tt)
+    mlml_tt = table2timetable(mlml_tt, 'RowTimes', 'datetime');
+end
+
+HABs_SantaCruzWharf_clean.datetime = datetime(HABs_SantaCruzWharf_clean.datetime, 'TimeZone', 'UTC');
+HABs_SantaCruzWharf_clean.datetime = dateshift(HABs_SantaCruzWharf_clean.datetime, 'start', 'day'); % Remove time component
+if ~istimetable(HABs_SantaCruzWharf_clean)
+    HABs_SantaCruzWharf_clean = table2timetable(HABs_SantaCruzWharf_clean, 'RowTimes', 'datetime');
+end
+
+% Load and process satellite data
+shadow_filename = 'Q:\Dante\data\satellite_chl_CCE\shadow\chl\chl5d_EOF2shadow.csv';
+fullbay_filename = 'Q:\Dante\data\satellite_chl_CCE\shadow\chl\chl5d_MBarea.csv';
+
+data_shadow = readtable(shadow_filename);
+data_fullbay = readtable(fullbay_filename);
+
+data_shadow.datetime = datetime(data_shadow.SYear, 1, 1) + days(data_shadow.SDay - 1);
+data_shadow.datetime.TimeZone = 'UTC';
+data_fullbay.datetime = datetime(data_fullbay.SYear, 1, 1) + days(data_fullbay.SDay - 1);
+data_fullbay.datetime.TimeZone = 'UTC';
+
+if ~istimetable(data_shadow)
+    data_shadow = table2timetable(data_shadow, 'RowTimes', 'datetime');
+end
+if ~istimetable(data_fullbay)
+    data_fullbay = table2timetable(data_fullbay, 'RowTimes', 'datetime');
+end
+
+% Subset to only columns of interest and synchronize datasets
+pm25_fluorometer = rmmissing(synchronize(mlml_tt(:, {'fluorescence'}), sc_pm2_5_daily(:, {'pm2_5'})));
+pm25_shore = rmmissing(synchronize(HABs_SantaCruzWharf_clean(:, {'Avg_Chloro'}), sc_pm2_5_daily(:, {'pm2_5'})));
+pm25_shadow = rmmissing(synchronize(data_shadow(:, {'Mean'}), sc_pm2_5_daily(:, {'pm2_5'})));
+pm25_fullbay = rmmissing(synchronize(data_fullbay(:, {'Mean'}), sc_pm2_5_daily(:, {'pm2_5'})));
+
+% Extract time series
+chl_metrics = {pm25_fluorometer.pm2_5, pm25_fluorometer.fluorescence;
+               pm25_shore.pm2_5, pm25_shore.Avg_Chloro;
+               pm25_shadow.pm2_5, pm25_shadow.Mean;
+               pm25_fullbay.pm2_5, pm25_fullbay.Mean};
+chl_labels = {'Fluorometer (Daily)', 'Shore Station (Weekly)', 'Satellite Shadow (5-Day)', 'Satellite Full Bay (5-Day)'};
+
+% Define extended lag ranges for each dataset
+lag_ranges = {[50, -50], [8, -8], [10, -10], [10, -10]};
+previous_lag_ranges = {[30, -10], [4, -2], [6, -2], [6, -2]};
+colors = {'#3e8a52', '#50e678', '#66b398', '#6c84bd'};
+
+% Compute cross-correlation with significance testing & Benjamini-Hochberg correction
+numtests = 5000;
+alpha = 0.05;
+xcorr_matrix = cell(size(chl_metrics, 1), 1);
+significant_xcorr = cell(size(chl_metrics, 1), 1);
+lag_vectors = cell(size(chl_metrics, 1), 1);
+all_p_values = [];
+
+for i = 1:length(chl_labels)
+    max_lag = lag_ranges{i}(1);
+    min_lag = lag_ranges{i}(2);
+    num_lags = max_lag - min_lag + 1;
+    lag_vectors{i} = min_lag:max_lag;
+    
+    chl_series = fillmissing(chl_metrics{i,2}, 'linear');
+    pm25_series = fillmissing(chl_metrics{i,1}, 'linear');
+    valid_idx = ~isnan(chl_series) & ~isnan(pm25_series);
+    chl_series = chl_series(valid_idx);
+    pm25_series = pm25_series(valid_idx);
+    
+    [cc, lags] = xcorr(chl_series, pm25_series, max_lag, 'coeff');
+    lag_indices = (lags >= min_lag) & (lags <= max_lag);
+    xcorr_matrix{i} = cc(lag_indices);
+    
+    % Significance testing via permutation test
+    max_rand_ccs = zeros(numtests, 1);
+    for test = 1:numtests
+        rand_series = chl_series(randperm(length(chl_series)));
+        [rand_cc, ~] = xcorr(rand_series, pm25_series, max_lag, 'coeff');
+        max_rand_ccs(test) = max(abs(rand_cc(lag_indices)));
+    end
+    threshold = prctile(max_rand_ccs, 100 * (1 - alpha));
+    significant_xcorr{i} = abs(xcorr_matrix{i}) > threshold;
+    p_value = mean(max_rand_ccs >= max(abs(xcorr_matrix{i}))); % Compute p-value
+    all_p_values = [all_p_values, p_value];
+end
+
+% Benjamini-Hochberg correction
+[sorted_p, sort_idx] = sort(all_p_values);
+m = length(all_p_values);
+bh_thresholds = (1:m) * alpha / m;
+significant_idx = sorted_p <= bh_thresholds;
+corrected_significant = false(size(all_p_values));
+corrected_significant(sort_idx(significant_idx)) = true;
+
+% % Plot lag vs correlation in 4 subplots with adjusted y-limits
+% figure;
+% for i = 1:length(chl_labels)
+%     subplot(4,1,i);
+%     plot(lag_vectors{i}, xcorr_matrix{i}, 'b', 'LineWidth', 2);
+%     hold on;
+%     sig_indices = find(corrected_significant);
+%     if ~isempty(sig_indices)
+%         plot(lag_vectors{i}(sig_indices), xcorr_matrix{i}(sig_indices), 'ro', 'MarkerSize', 6, 'MarkerFaceColor', 'r');
+%     end
+%     ylim([0, 1.1 * max(abs(xcorr_matrix{i}))]);
+%     if contains(chl_labels{i}, 'Weekly')
+%         xticklabels(xticks * 7);
+%     elseif contains(chl_labels{i}, '5-Day')
+%         xticklabels(xticks * 5);
+%     end
+%     hold off;
+%     title(chl_labels{i});
+%     xlabel('Lag (days)');
+%     ylabel('Cross-Correlation');
+%     grid on;
+% end
+% legend({'Cross-Correlation', 'Significant'}, 'Location', 'best');
+% sgtitle('Cross-Correlation of PM2.5 and Chlorophyll-a');
+% 
+% 
+% %%
+figure;
+for i = 1:length(chl_labels)
+    max_lag = lag_ranges{i}(1);
+    min_lag = lag_ranges{i}(2);
+    num_lags = max_lag - min_lag + 1;
+    lag_vectors{i} = min_lag:max_lag;
+    
+    chl_series = fillmissing(chl_metrics{i,2}, 'linear');
+    pm25_series = fillmissing(chl_metrics{i,1}, 'linear');
+    valid_idx = ~isnan(chl_series) & ~isnan(pm25_series);
+    chl_series = chl_series(valid_idx);
+    pm25_series = pm25_series(valid_idx);
+    
+    [cc, lags] = xcorr(chl_series, pm25_series, max_lag, 'coeff');
+    lag_indices = (lags >= min_lag) & (lags <= max_lag);
+    xcorr_matrix{i} = cc(lag_indices);
+    
+    % Shaded region for previous lag range
+    subplot(3,1,min(i,3));
+    hold on;
+    xline(previous_lag_ranges{i}(1), 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-')
+
+    fill([previous_lag_ranges{i}(1), previous_lag_ranges{i}(1), previous_lag_ranges{i}(2), previous_lag_ranges{i}(2)], ...
+         [-0.2 + min(xcorr_matrix{i}), 0.2 + max(xcorr_matrix{i}), 0.2 + max(xcorr_matrix{i}), -0.2 + min(xcorr_matrix{i})], ...
+         [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+    xline(previous_lag_ranges{i}(2), 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-')
+    
+    % Plot cross-correlation
+    plot(lag_vectors{i}, xcorr_matrix{i}, 'Color', colors{i}, 'LineWidth', 2);
+    hold on
+    title(chl_labels{i});
+    xlabel('Lag (days)', 'FontSize', 8, 'FontName', 'Arial');
+    ylabel('Cross-Correlation', 'FontSize', 8, 'FontName', 'Arial');
+    ylim([-0.2 + min(xcorr_matrix{i}), 0.2 + max(xcorr_matrix{i})]);
+    if contains(chl_labels{i}, 'Weekly')
+        xticklabels(xticks * 7);
+    elseif contains(chl_labels{i}, '5-Day')
+        xticklabels(xticks * 5);
+    end
+    if i <3
+        text(0.02, 0.9, char(96 + i), 'Units', 'normalized', 'FontSize', 8, 'FontWeight', 'bold');
+    end
+    grid on;
+end
+
+% Merge the last two plots (satellite shadow and full bay) into one
+subplot(3,1,3);
+hold on;
+plot(lag_vectors{3}, xcorr_matrix{3}, 'Color', colors{3}, 'LineWidth', 2);
+plot(lag_vectors{4}, xcorr_matrix{4}, 'Color', colors{4}, 'LineWidth', 2);
+title('Satellite (5-day)');
+xlabel('Lag (days)', 'FontSize', 8, 'FontName', 'Arial');
+ylabel('Cross-Correlation');
+grid on;
+legend({'Shadow', 'Full Bay'}, 'Location', 'northeast', 'AutoUpdate', 'off');
+text(0.02, 0.9, 'c', 'Units', 'normalized', 'FontSize', 8, 'FontWeight', 'bold');
+
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 7]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\pm25_chla_xcorr.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\pm25_chla_xcorr.pdf');
+end
+saving = 0;
+
+
+%% Fig. S: Chlorophyll image time seires
+close all;
+
+% Define years to loop through
+years = 2015:2023;
+
+% Define bounds for subsetting
+latBounds = [36.3219, 37.180664]; 
+lonBounds = [-122.68085, -121.6675];
+
+% Define coordinate calculations
+maxX = 307; 
+maxY = 318;
+[x, y] = meshgrid(0:maxX, 0:maxY);
+lon = -122.68085 + 0.003290 * x;
+lat = 37.180664 - 0.002701 * y;
+
+% Define fixed tick positions
+xTicks = [-122.6, -122.3, -122.0, -121.7];
+yTicks = [36.4, 36.6, 36.8, 37];
+
+for year = years
+    %% Set up file path for the current year
+    file_path = sprintf('Q:\\Dante\\data\\MB_Wildfire_Obs\\satellite_chl\\%d\\C%d_chl_15day', year, year);
+
+    % List all HDF files in the directory
+    files = dir(fullfile(file_path, '*.hdf'));
+    fileNames = {files.name};
+
+    % Extract second YYYYDDD segment and convert to datetime
+    fileDates = datetime(regexp(fileNames, '\d{7}(?=__comp)', 'match', 'once'), ...
+                         'InputFormat', 'yyyyDDD');
+
+    % Filter between 7/1 and 10/31 of the given year
+    validIdx = fileDates >= datetime(year, 7, 1) & fileDates <= datetime(year, 10, 31);
+    fileNames = fileNames(validIdx);
+    fileDates = fileDates(validIdx);
+
+    % Create tiled layout for multiple plots
+    numFiles = length(fileNames);
+    if numFiles == 0
+        fprintf('No files found for year %d, skipping...\n', year);
+        continue;
+    end
+
+    nRows = ceil(sqrt(numFiles)); 
+    nCols = ceil(numFiles / nRows);
+    figure;
+    t = tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+    for f = 1:numFiles
+        fullFilePath = fullfile(file_path, fileNames{f});
+        info = hdfinfo(fullFilePath);
+        dataSetName = info.SDS(1).Name;
+        data = hdfread(fullFilePath, dataSetName);
+
+        % Coastline mask
+        coastlineMask = data == -1;
+        boundaries = bwboundaries(coastlineMask);
+
+        % Correct signed byte issue
+        data = int16(data);
+        data(data < 0) = data(data < 0) + 256;
+
+        % Filter invalid data
+        data(data < 2 | data > 254) = NaN;
+        data(data == 0) = 0.01;
+        data(data == 1 | data == 255) = NaN;
+
+        % Convert pixel values to Chlorophyll concentration
+        chlConcentration = 10.^(0.015 * double(data) - 2.0);
+
+        % Plot
+        ax = nexttile;
+        imagesc(lon(1,:), lat(:,1), chlConcentration);
+        shading interp;
+        hold on;
+        for b = 1:length(boundaries)
+            boundary = boundaries{b};
+            validIndices = boundary(:,1) <= size(lat,1) & boundary(:,2) <= size(lon,2);
+            if all(validIndices)
+                boundaryLat = lat(sub2ind(size(lat), boundary(validIndices,1), boundary(validIndices,2)));
+                boundaryLon = lon(sub2ind(size(lon), boundary(validIndices,1), boundary(validIndices,2)));
+                plot(boundaryLon, boundaryLat, 'k', 'LineWidth', 1);
+            end
+        end
+        hold off;
+
+        % Set colormap similar to cmocean chlorophyll
+        colormap(cmocean('algae'));
+        caxis([0.01 15]);
+        title(datestr(fileDates(f), 'mm/dd/yyyy'));
+        set(gca, 'YDir', 'normal');
+
+        % Apply explicit tick positions
+        ax.FontSize = 12;
+        ax.FontName = 'Arial';
+        ax.XTick = xTicks;
+        ax.YTick = yTicks;
+        ax.XTickLabelRotation = 45;
+    end
+
+    % Add a shared colorbar
+    cb = colorbar;
+    cb.Label.String = 'Chlorophyll (mg m^{-3})';
+    cb.Layout.Tile = 'east';  % Aligns with tiled layout
+    cb.FontSize = ftsz+4; % Set colorbar font size
+
+    % Set figure size for publication
+    set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 7]);  
+    set(gcf, 'PaperPositionMode', 'auto');
+
+    % Save figure
+    saving = 1;
+    if saving == 1
+        savePath = sprintf('C:\\Users\\Dante Capone\\OneDrive\\Desktop\\Scripps_PhD\\Wildfire_Obs\\MB_Wildfire_Obs\\figures\\final\\chl_concentration_%d', year);
+        print(gcf, '-dpng', '-r1200', [savePath, '.png']);
+        print(gcf, '-dpdf', '-r1200', [savePath, '.pdf']);
+    end
+    saving = 0;
+
+    % Close the figure to free memory
+    close(gcf);
+end
+
+
+%% Supplementatl Figure Biovolume/Carbon
+% === 1. Load satellite chlorophyll ===
+filename = 'Q:\Dante\data\satellite_chl_CCE\shadow\chl\chl5d_EOF2shadow.csv';
+sat_data = readtable(filename);
+sat_data = sat_data(sat_data.SYear == 2020, :);
+sat_data.Time = datetime(2020,1,1) + days(sat_data.SDay - 1);
+sat_chl = sat_data.Mean;
+sat_time = sat_data.Time;
+
+% === 2. Load in-situ chloro from HABs table ===
+hab_mask = year(HABs_SantaCruzWharf_clean.datetime) == 2020;
+hab_time = HABs_SantaCruzWharf_clean.datetime(hab_mask);
+avg_chloro = HABs_SantaCruzWharf_clean.Avg_Chloro(hab_mask);
+
+% === 3. IFCB TotalSum ===
+ifcb_mask = year(ifcb_nass_morpho_2016_2023.datetime) == 2020;
+ifcb_time = ifcb_nass_morpho_2016_2023.datetime(ifcb_mask);
+ifcb_cells = ifcb_nass_morpho_2016_2023.TotalSum(ifcb_mask);
+ifcb_time.TimeZone = '';
+hab_time.TimeZone = '';
+sat_time.TimeZone = '';
+
+% === 4. Nearest datetime matching ===
+[~, idx_ifcb_for_hab] = min(abs(hab_time - ifcb_time'), [], 2);
+[~, idx_ifcb_for_sat] = min(abs(sat_time - ifcb_time'), [], 2);
+matched_cells_hab = ifcb_cells(idx_ifcb_for_hab);
+matched_cells_sat = ifcb_cells(idx_ifcb_for_sat);
+
+% === 5. PAR data from physical_forcings_biology_table ===
+phys_mask = year(physical_forcings_biology_table.datetime) == 2020;
+phys_dt = physical_forcings_biology_table.datetime(phys_mask);
+PAR = physical_forcings_biology_table.surface_downwelling_photosynthetic_photon_flux_in_air(phys_mask);
+phys_dt.TimeZone = '';
+
+[~, idx_PAR_hab] = min(abs(hab_time - phys_dt'), [], 2);
+[~, idx_PAR_sat] = min(abs(sat_time - phys_dt'), [], 2);
+PAR_hab = PAR(idx_PAR_hab);
+PAR_sat = PAR(idx_PAR_sat);
+
+% === 6. Filter NaNs ===
+valid_hab = ~isnan(avg_chloro) & ~isnan(matched_cells_hab) & ~isnan(PAR_hab);
+valid_sat = ~isnan(sat_chl) & ~isnan(matched_cells_sat) & ~isnan(PAR_sat);
+
+dt_hab = hab_time(valid_hab);
+chl1 = avg_chloro(valid_hab);
+cells1 = matched_cells_hab(valid_hab);
+par1 = PAR_hab(valid_hab);
+
+dt_sat = sat_time(valid_sat);
+chl2 = sat_chl(valid_sat);
+cells2 = matched_cells_sat(valid_sat);
+par2 = PAR_sat(valid_sat);
+
+% === 7. Compute ratios ===
+ratio1 = chl1 ./ cells1;  % Avg_Chloro
+ratio2 = chl2 ./ cells2;  % Satellite
+
+% === 8. Regress out PAR ===
+lm1 = fitlm(par1, ratio1);
+lm2 = fitlm(par2, ratio2);
+resid1 = lm1.Residuals.Raw;
+resid2 = lm2.Residuals.Raw;
+
+% === 9. Plot ===
+figure('Position', [100 100 800 600]);
+
+% --- Top subplot: Chl & TotalSum ---
+subplot(2,1,1)
+yyaxis left
+plot(dt_hab, chl1, 'Color', [0.1 0.6 0.1], 'LineWidth', 2,'LineStyle','-'); 
+hold on;
+plot(dt_sat, chl2, 'Color', [0.4 0.9 0.4], 'LineWidth', 2,'LineStyle','-'); 
+ylabel('Chlorophyll (μg/L)');
+
+xline(start_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-','HandleVisibility', 'off');
+fill([shade_start_week, shade_start_week, shade_end_week, shade_end_week], ...
+    [min(ylim) * 4.5, max(ylim) * 1.5, max(ylim) * 1.5, min(ylim) * 4.5], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2,'HandleVisibility', 'off');
+xline(end_date_week, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+xline(lag_date_week, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':','HandleVisibility', 'off');
+
+yyaxis right
+plot(ifcb_time, ifcb_cells, 'Color', [0.1 0.3 0.8], 'LineWidth', 2,'LineStyle','-'); 
+ylabel('Biovolume');
+title('Satellite and In-Situ Chlorophyll with Total Cell Count (2020)');
+xlim([datetime(2020,5,1) datetime(2020,11,1)]);
+grid on;
+
+%Add shading
+start_date = datetime(2020, 8, 16);
+end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+august_date = datetime(2020, 9, 5);
+czu_date=datetime(2020, 8, 21);
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% --- Bottom subplot: Ratios ---
+subplot(2,1,2)
+plot(dt_hab, ratio1, 'Color', [0.1 0.6 0.1], 'LineWidth', 2); hold on;
+plot(dt_sat, resid2, 'Color', [0.4 0.9 0.4], 'LineWidth', 2);
+xlabel('Date');
+ylabel('Chl / TotalSum');
+title('Raw and PAR-adjusted Chlorophyll / TotalSum Ratios (2020)');
+xlim([datetime(2020,5,1) datetime(2020,11,1)]);
+grid on;
+hold on
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+legend({'Avg\_Chloro','Satellite Chl','TotalSum','Raw Ratio','PAR-adjusted Satellite Ratio'}, 'Location', 'northwest',...
+    'AutoUpdate','off');
+
+% === 10. Save ===
+saving = 0;
+if saving == 1
+    savePath = 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\combined_chlorophyll_to_biovolume_2020';
+    print(gcf, '-dpng', '-r1200', [savePath, '.png']);
+    print(gcf, '-dpdf', '-r1200', [savePath, '.pdf']);
+end
+saving = 0;
+
+%% ========= Functions ========= 
+
+%% Function to parse the filename and determine the year and month
+function [year, month] = parseFilename(filename)
+    yearStr = filename(2:5);
+    year = str2double(yearStr);
+    doyStart = str2double(filename(6:8));
+    doyEnd = str2double(filename(13:15));
+    avgDoy = round(mean([doyStart doyEnd])); % Compute average day of the year
+
+    % Define month day ranges
+    monthDays = [0 31 59 90 120 151 181 212 243 273 304 334 366];
+    months = {'January', 'February', 'March', 'April', 'May', 'June', ...
+              'July', 'August', 'September', 'October', 'November', 'December'};
+
+    % Find the corresponding month
+    monthIdx = find(avgDoy > monthDays, 1, 'last');
+    month = months{monthIdx};
+end
+
+
+function [dateStr] = parseFilenameDay(filename)
+    % Extract the year and day of year from the filename
+    yearStr = filename(2:5);
+    year = str2double(yearStr);
+    doyStr = filename(6:8);
+    doy = str2double(doyStr);
+
+    % Determine if it is a leap year
+    if mod(year, 4) == 0
+        if mod(year, 100) == 0
+            if mod(year, 400) == 0
+                leapYear = true;  % Leap year
+            else
+                leapYear = false; % Not a leap year
+            end
+        else
+            leapYear = true;  % Leap year
+        end
+    else
+        leapYear = false;  % Not a leap year
+    end
+
+    % Compute the date from the day of year
+    startDate = datenum(year, 1, 1); % January 1 of the given year
+    dateNum = startDate + doy - 1; % Convert DOY to MATLAB date number
+    
+    % Format the date string as 'Month, Day Year'
+    dateStr = datestr(dateNum, 'mmmm, dd yyyy');
+end

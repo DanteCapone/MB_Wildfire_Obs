@@ -1,0 +1,290 @@
+%IOP Analysis
+
+% Define the directory where your CSV files are located
+directory = 'Q:\Dante\data\MB_Wildfire_Obs\satellite\iop';
+fileList = dir(fullfile(directory, '*.csv'));
+
+% Initialize a table for the combined data
+finalData = table();
+
+% Loop through each file
+for i = 1:length(fileList)
+    % Get the file name
+    fileName = fileList(i).name;
+    
+    % Extract the prefix (e.g., 'adg412') from the filename
+    prefix = fileName(1:strfind(fileName, '_')-1);
+    
+    % Read the CSV file with correct options
+    filePath = fullfile(directory, fileName);
+    opts = detectImportOptions(filePath);
+    
+    % Set the correct line for variable names (usually the first line)
+    opts.VariableNamesLine = 1;
+    
+    % Set the delimiter (if needed)
+    opts.Delimiter = ',';  % Adjust the delimiter if necessary (e.g., semicolon if CSV uses a different delimiter)
+    
+    % Select only columns 1 to 13
+    opts.SelectedVariableNames = opts.VariableNames(1:13);
+    
+    % Ensure the 'Image' column (col 1) is read as a string
+    opts = setvartype(opts, opts.VariableNames{1}, 'char');
+    
+    % Set columns 2:13 to numeric types
+    for col = 2:13
+        opts = setvartype(opts, opts.VariableNames{col}, 'double');
+    end
+    
+    % Read the table using the options
+    data = readtable(filePath, opts);
+    
+    % Extract relevant columns (we will skip the 'Image' column for processing)
+    meanData = data.Mean;
+    sYear = data.SYear;
+    sDay = data.SDay;
+    
+    % Construct the datetime using SYear and SDay (day of the year)
+    dates = datetime(sYear, 1, 1) + days(sDay - 1);
+    
+    % If it's the first file, initialize the final table with dates
+    if i == 1
+        finalData.Date = dates;
+    end
+    
+    % Add the mean data to the table as a new column
+    finalData.(prefix) = meanData;
+end
+
+% Save the final table to a CSV file (optional)
+writetable(finalData, fullfile(directory, '\processed\combined_eof_data.csv'));
+
+
+%% Plot the IOPs
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plots
+legend_on = 0;
+num_subplots = 3;
+
+% Extract the datetime column
+time = finalData.Date;
+
+% Get the column names of finalData, excluding the Date column
+variableNames = finalData.Properties.VariableNames(2:end);
+
+% Initialize a container to group the variables by their prefix
+groupedVars = containers.Map();
+
+% Loop through the variable names and group them based on the prefix before the first number
+for i = 1:length(variableNames)
+    varName = variableNames{i};
+    
+    % Extract the prefix (substring before the first digit)
+    prefix = regexp(varName, '^[a-zA-Z]+', 'match', 'once');
+    
+    % If the prefix doesn't exist in the map, initialize a new cell array
+    if ~isKey(groupedVars, prefix)
+        groupedVars(prefix) = {varName};  % Initialize the cell array with the first variable
+    else
+        currentGroup = groupedVars(prefix);  % Retrieve the existing group
+        currentGroup{end + 1} = varName;  % Append the new variable name
+        groupedVars(prefix) = currentGroup;  % Update the map with the new group
+    end
+end
+
+% Get the group keys (prefixes)
+keys = groupedVars.keys;
+
+hold on;
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\iops_all.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\iops_all.pdf');
+end
+saving = 0;
+
+
+%% Initialize the figure
+figure;
+
+% Define the number of subplots (up to 4 groups to plot)
+numSubplots = min(4, length(keys));
+
+% Loop through each group and plot the variables in subplots
+for k = 1:numSubplots
+    prefix = keys{k};  % Get the current prefix (e.g., 'adg', 'aph', etc.)
+    varsToPlot = groupedVars(prefix);  % Get the variable names for this group
+    
+    % Create subplot for the current group
+    subplot(2, 2, k);  % 2x2 subplots (4 subplots total)
+    hold on;
+    
+    % Loop through the variables in the group and plot each one on the same axis
+    for j = 1:length(varsToPlot)
+        plot(time, finalData{:, varsToPlot{j}}, 'DisplayName', varsToPlot{j},'LineWidth',linewdt);  % Use DisplayName for legend
+    end
+    
+    % Customize the subplot
+    xlabel('Time');
+    ylabel([prefix ' Variables']);
+    title([prefix]);
+    
+    % Add legend and turn off AutoUpdate to prevent updates as new plots are added
+    legend('show', 'AutoUpdate', 'off','Location','bestoutside');
+    hold off;
+    hold on;
+    ax = gca;
+    ax.FontSize = ftsz;
+    ax.FontName = ftname;
+
+end
+
+% Adjust the figure size and layout
+sgtitle('Monterey Bay IOPs');
+
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\iops_all.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\iops_all.pdf');
+end
+saving = 0;
+
+%% Now look at EOFs over time
+
+
+% Extract the datetime column and the data for PCA (excluding datetime)
+time = finalData.Date;  % Datetime column
+dataForPCA = finalData{:, 2:end};  % Exclude the first column (datetime)
+
+% Ensure there are no NaN values (fill missing values if necessary)
+dataForPCA = fillmissing(dataForPCA, 'linear');
+
+% Standardize the data (mean of zero, standard deviation of one)
+dataForPCA = zscore(dataForPCA);
+
+% Perform PCA (EOF analysis) on the data
+[coeff, score, latent, tsquared, explained] = pca(dataForPCA);
+
+% Plot the variance explained by each principal component (EOF)
+figure;
+pareto(explained);
+xlabel('Principal Component (PC)');
+ylabel('Variance Explained (%)');
+title('Variance Explained by Each Principal Component (PC)');
+
+
+hold on;
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\pcs_var_explained.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\pcs_var_explained.pdf');
+end
+saving = 0;
+
+% Plot the first few EOFs (principal components) over time
+figure;
+numComponentsToPlot = 3;  % Number of EOFs to plot
+
+colorz = [
+    0.75, 0.1, 0;        % Darker shade of Red
+    0.3333, 0.6588, 0.4078;  % Green
+    0.4, 0.6, 0.8;        % Blue
+    0.7882, 0.4588, 0.9216   % Pastel Purple
+];
+
+
+for i = 1:numComponentsToPlot
+    subplot(numComponentsToPlot, 1, i);
+    plot(time, score(:, i), '-o', 'Color', colorz(i,:));
+    xlabel('Time');
+    ylabel(['PC ' num2str(i)]);
+    title(['PC ' num2str(i) ' Time Series']);
+end
+
+hold on;
+ax = gca;
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for publication (double-column width)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\pcs1_3.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\iops\pcs1_3.pdf');
+end
+saving = 0;
+
+%% Optional: Plot cumulative variance explained by the principal components
+figure;
+plot(cumsum(explained), '-o');
+xlabel('Number of Components');
+ylabel('Cumulative Variance Explained (%)');
+title('Cumulative Variance Explained by Principal Components');
+
+
+%% 
+
+% Assuming SDay is the number of days since the start of the year
+% Define the year (e.g., 2020 in this case)
+year_base = 2020;
+
+% Convert SDay to datetime
+M2020annotstatistgridmbay300mBay.DateTime = datetime(year_base, 1, 1) + days(M2020annotstatistgridmbay300mBay.SDay - 1);
+
+% Add Day of Year (DOY) as a variable
+M2020annotstatistgridmbay300mBay.DOY = day(M2020annotstatistgridmbay300mBay.DateTime, 'dayofyear');
+
+
+% Plot with date ticks every 5 days
+plot(M2020annotstatistgridmbay300mBay.SDay, M2020annotstatistgridmbay300mBay.adg443);
+hold on;
+plot(M2020annotstatistgridmbay300mBay.SDay, M2020annotstatistgridmbay300mBay.Min);
+hold on;
+plot(M2020annotstatistgridmbay300mBay.SDay, M2020annotstatistgridmbay300mBay.Max);
+
+% Adjust x-axis ticks to every 5 days
+xticks_start = M2020annotstatistgridmbay300mBay.SDay(1);
+xticks_end = M2020annotstatistgridmbay300mBay.SDay(end);
+xticks_new = xticks_start:5:xticks_end;
+xticks(xticks_new);
+
+% Format date ticks
+datetick('x', 'mmm-dd', 'keepticks');
+xlabel('Date');
+ylabel('adg443');
+grid on;
+hold off;

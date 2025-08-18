@@ -1,0 +1,1642 @@
+%% IFCB Taxa abundance analysis 
+
+%Add paths
+addpath('Q:\Dante\Wildfire_Obs\functions\')
+addpath('Q:\Dante\Wildfire_Obs\')
+addpath(genpath('Q:\Dante\data\MB_Wildfire_Obs\processed_data\'))
+
+%IFCB
+load('ifcb_ucsc_all_mean.mat')
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat')
+
+%Load wildfire data
+
+%PM 2.5
+load('Q:\Dante\data\MB_Wildfire_Obs\pm2_5\sc_pm2.5_daily_all.mat')
+
+%Subset to a site
+sc_pm2_5_daily=sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName=="San Lorenzo Valley Middle School",:);
+
+
+
+% Goal: Plot with taxa on y, time lag on the x and 
+
+% Extract the taxa columns and AOD_500nm column
+taxa_data = table2array(ifcbbray(:, [2:52,59]));
+aod_500nm =ifcbbray.AOD_500nm;
+
+% Initialize variables to store coefficients and lags
+cc = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));
+lags = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));  % Corrected dimensions
+
+taxa = ifcbbray.Properties.VariableNames([2:52,59]);
+
+
+
+
+%%
+close all
+plotting = 1;
+
+sc_pm2_5_daily_join=sc_pm2_5_daily(:,["datetime","pm2_5"]);
+% Process data for the year 2020
+% sc_pm2_5_daily = sc_pm2_5_daily(sc_pm2_5_daily.datetime.Year == 2020, :);
+
+% Merge the sc_pm2_5_daily data with ifcbbray based on datetime
+ifcb_pm25 = outerjoin(ifcbbray, sc_pm2_5_daily_join, 'Keys', 'datetime', 'MergeKeys', true, 'Type', 'left');
+
+
+% Assuming ifcb_pm25 is already loaded into the workspace
+
+% Extract the taxa columns and AOD_500nm column
+ifcb_taxa_sel=ifcb_pm25(:, [2:52,59]);
+taxa_data = table2array(ifcb_taxa_sel);
+pm25 = ifcb_pm25.pm2_5;
+
+
+
+%% Cross corraltion and significance testing
+% Parameters for significance thresholding
+numtests = 5000;  % Increased number of permutations for better p-value estimation
+alpha = 0.05;  % Significance level
+
+% Initialize containers for results for all taxa
+all_taxa = {};
+all_max_correlations = [];
+all_max_lags = [];
+all_p_values = [];
+all_adjusted_p_values = [];
+
+% Loop through each taxon
+for i = 1:size(taxa_data, 2)
+    % Get the current taxon data and PM2.5 data (after filling missing values)
+    series1 = ifcb_pm25{:, taxa{i}};
+    series2 = fillmissing(pm25, 'linear');
+    
+    % Compute the actual cross-correlation over the full lag range
+    [cc, lags] = xcorr(series1, series2, 'coeff');
+    
+    % Filter to keep only lags between -10 and 30 (window of interest)
+    lag_filter = (lags >= -10) & (lags <= 30);
+    filtered_cc = cc(lag_filter);
+    filtered_lags = lags(lag_filter);
+    
+    % Find the maximum cross-correlation and corresponding lag within the window of interest
+    [max_cc, max_idx] = max(abs(filtered_cc));
+    max_lag = filtered_lags(max_idx);
+    
+    % Perform random permutations using Fourier surrogate method (across all lags)
+    max_rand_ccs = zeros(numtests, 1);
+    for test = 1:numtests
+        rand_series1 = generate_fourier_surrogate(series1);  % Generate Fourier surrogate for series1
+        
+        % Compute cross-correlation across all lags
+        [xc_rand, ~] = xcorr(rand_series1, series2, 'coeff');
+        
+        % Now filter to keep only lags between -10 and 30 (same window of interest)
+        rand_filtered_cc = xc_rand(lag_filter);
+        
+        % Store the maximum cross-correlation from the window of interest
+        max_rand_ccs(test) = max(abs(rand_filtered_cc));
+    end
+
+    % Dynamic threshold based on the 95th percentile of null distribution
+    dynamic_threshold = prctile(max_rand_ccs, 95);
+
+    % Calculate p-value as the proportion of random max cross-correlations that exceeded the observed max
+    tolerance = 1e-5;
+    p_value = mean(max_rand_ccs >= (max_cc - tolerance));
+    
+    % Apply a small minimum threshold to avoid p-value = 0
+    p_value = max(p_value, 1 / numtests);  % Ensure p-value is not exactly 0
+
+    % Save the results for all taxa, whether significant or not
+    all_taxa = [all_taxa, taxa{i}];  % Save taxon name
+    all_max_correlations = [all_max_correlations, max_cc];  % Save max correlation
+    all_max_lags = [all_max_lags, max_lag];  % Save corresponding lag
+    all_p_values = [all_p_values, p_value];  % Save non-adjusted p-value
+end
+
+
+%% Now apply Benjamini-Hochberg FDR correction to all p-values
+[sorted_p_values, sort_idx] = sort(all_p_values);  % Sort p-values in ascending order
+num_taxa = length(all_p_values);  % Total number of taxa
+
+% Adjust the p-values according to the Benjamini-Hochberg procedure
+adjusted_p_values = sorted_p_values .* num_taxa ./ (1:num_taxa);
+adjusted_p_values(adjusted_p_values > 1) = 1;  % Ensure adjusted p-values do not exceed 1
+
+% Re-map the adjusted p-values back to their original order
+unsorted_adjusted_p_values = zeros(size(all_p_values));
+unsorted_adjusted_p_values(sort_idx) = adjusted_p_values;  % Remap sorted p-values to original order
+all_adjusted_p_values = unsorted_adjusted_p_values;  % Store the adjusted p-values for all taxa
+
+% Prepare the output with significance markings
+taxa_with_marks = all_taxa;  % Copy of taxa names
+for i = 1:num_taxa
+    % Mark taxa with significant non-adjusted p-value
+    if all_p_values(i) < alpha
+        taxa_with_marks{i} = [taxa_with_marks{i}, '*'];  % Add * to the taxon name
+    end
+    % Mark taxa with significant adjusted p-value
+    if all_adjusted_p_values(i) < alpha
+        taxa_with_marks{i} = [taxa_with_marks{i}, '*'];  % Add ** to the taxon name
+    end
+end
+
+% Round the p-values and max CC to 3 decimal places
+rounded_p_values = round(all_p_values, 3);
+rounded_adjusted_p_values = round(all_adjusted_p_values, 3);
+rounded_max_correlations = round(all_max_correlations, 3);
+
+% Create a table with the columns: taxa, max CC, lag, non-adjusted p-value, adjusted p-value
+results_table = table(taxa_with_marks', rounded_max_correlations', all_max_lags', rounded_p_values', rounded_adjusted_p_values', ...
+    'VariableNames', {'Taxa', 'Max_CC', 'Lag', 'P_value', 'Adjusted_p_value'});
+
+% Sort the table by Max_CC in descending order
+sorted_results_table = sortrows(results_table, 'Max_CC', 'descend');
+
+% Save the sorted table to a CSV file
+csv_filename = 'all_taxa_with_p_values.csv';
+writetable(sorted_results_table, csv_filename);
+
+% Display the sorted table to the user
+disp('Results saved to all_taxa_with_p_values.csv');
+disp(sorted_results_table);
+
+% Plot the null distribution of maximum cross-correlations for visualization
+figure;
+histogram(all_max_rand_ccs, 30);
+hold on;
+xline(dynamic_threshold, 'r', 'Threshold (95th percentile)');
+title('Null Distribution of Max Cross-Correlations');
+xlabel('Max Cross-Correlation (Null)');
+ylabel('Frequency');
+legend('Random Surrogate CCs', 'Threshold');
+hold off;
+
+
+%% Now all taxa for plotting
+numtests = 5000;  % Increased number of permutations for better p-value estimation
+alpha = 0.05;  % Significance level
+
+% Initialize containers for significant results
+significant_taxa = {};
+significant_p_values = [];
+significant_max_correlations = [];
+significant_max_lags = [];
+all_max_rand_ccs = [];  % Store all random max cross-correlations for thresholding
+
+% Store cross-correlation values for the heatmap
+all_cc = [];  % Will store cross-correlation values for all taxa
+all_lags = lags;  % Store all possible lags (shared across taxa)
+significant_mask = zeros(length(all_lags), size(taxa_data, 2));  % Initialize mask for significant values
+
+% Loop through each taxon
+for i = 1:size(taxa_data, 2)
+    % Get the current taxon data and PM2.5 data (after filling missing values)
+    series1 = ifcb_pm25{:, taxa{i}};
+    series2 = fillmissing(pm25, 'linear');
+    
+    % Compute the actual cross-correlation over the full lag range
+    [cc, lags] = xcorr(series1, series2, 'coeff');
+    
+    % Store the cross-correlation values for this taxon
+    all_cc(:, i) = cc;  % Add to all cross-correlation values for the heatmap
+    
+    % Filter to keep only lags between -10 and 30 (window of interest)
+    lag_filter = (lags >= -10) & (lags <= 30);
+    filtered_cc = cc(lag_filter);
+    filtered_lags = lags(lag_filter);
+    
+    % Find the maximum cross-correlation and corresponding lag within the window of interest
+    [max_cc, max_idx] = max(abs(filtered_cc));
+    max_lag = filtered_lags(max_idx);
+    
+    % Perform random permutations using Fourier surrogate method (across all lags)
+    max_rand_ccs = zeros(numtests, 1);
+    for test = 1:numtests
+        rand_series1 = generate_fourier_surrogate(series1);  % Generate Fourier surrogate for series1
+        
+        % Compute cross-correlation across all lags
+        [xc_rand, ~] = xcorr(rand_series1, series2, 'coeff');
+        
+        % Now filter to keep only lags between -10 and 30 (same window of interest)
+        rand_filtered_cc = xc_rand(lag_filter);
+        
+        % Store the maximum cross-correlation from the window of interest
+        max_rand_ccs(test) = max(abs(rand_filtered_cc));
+    end
+    all_max_rand_ccs = [all_max_rand_ccs; max_rand_ccs];  % Collect max values from all tests
+
+    % Dynamic threshold based on the 95th percentile of null distribution
+    dynamic_threshold = prctile(max_rand_ccs, 95);
+    
+    % Only consider the taxon if its max CC exceeds the dynamic threshold
+    if max_cc > dynamic_threshold
+        % Calculate p-value as the proportion of random max cross-correlations that exceeded the observed max
+        tolerance = 1e-5;
+        p_value = mean(max_rand_ccs >= (max_cc - tolerance));
+        
+        % Apply a small minimum threshold to avoid p-value = 0
+        p_value = max(p_value, 1 / numtests);  % Ensure p-value is not exactly 0
+        
+        % Check if the p-value is significant
+        if p_value < alpha
+            % Mark the cross-correlation as significant in the mask
+            significant_mask(lag_filter, i) = (abs(filtered_cc) > dynamic_threshold);  % Mark * for significant points
+        end
+    end
+end
+
+
+
+
+%% --- Heatmap Plotting with '*' for Taxa with Significant Adjusted P-values --- %
+clf;
+taxa=ifcbbray.Properties.VariableNames([2:52,59]);
+
+% Base taxa names
+taxa_raw = ifcbbray.Properties.VariableNames([2:52,59]);
+taxa_clean = strrep(taxa_raw, '_', ' ');
+
+% Define italic taxa
+italic_taxa = {
+    'Akashiwo', 'Asterionellopsis', 'Chaetoceros', ...
+    'Cochlodinium', 'Cryptophyte', 'Cyl Nitz', ...
+    'Det Cer Lau', 'Dictyocha', 'Dinophysis', ...
+    'Ditylum', 'Entomoneis', 'Eucampia', ...
+    'Guin Dact', 'Hemiaulus', 'Leptocylindrus', ...
+    'Pennate diatom', 'Polykrikos', 'Pseudo nitzschia', ...
+    'Skeletonema', 'Thalassionema', 'Thalassiosira', ...
+    'Taratra', 'Tontonia', 'Tontoniid', ...
+    'Tropidoneis', 'Vicicitus'
+};
+
+% --- Append '*' to taxa names if their adjusted p-value is significant (< 0.05) --- %
+for i = 1:length(taxa)
+    if all_adjusted_p_values(i) < alpha  % Check if the adjusted p-value is significant
+        taxa{i} = [taxa{i}, '*'];  % Append '*' to the taxon name
+    end
+end
+
+% Plot heatmap
+XLabels = lags;
+CustomXLabels = string(XLabels);
+CustomXLabels(mod(XLabels, xmax/10) ~= 0) = " ";  % Set custom x-axis tick labels
+
+clf;
+hBar = heatmap(lags, taxa, all_cc', 'Colormap', jet, 'ColorLimits', [0, 0.8]);  % Heatmap of cross-correlation coefficients
+colorbar;  % Add colorbar to show strength of coefficients
+% title('Cross-correlation between PM 2.5 Anomaly and IFCB Phytoplankton Abundance');
+xlabel('Lag (days after PM 2.5 anomaly)');
+ylabel('');
+hBar.XDisplayLabels = CustomXLabels;
+hBar.GridVisible = 'off';
+
+% Adjust x-axis limits
+xlim([0, xmax]);
+
+
+% Format the heatmap for publication
+s = struct(hBar);
+s.XAxis.TickLabelRotation = 0;  % Set x-axis labels horizontal
+s.XAxis.FontSize = ftsz;  % Set x-axis font size
+s.XAxis.FontName = ftname;  % Set x-axis font name
+s.YAxis.FontSize = ftsz;  % Set y-axis font size
+s.YAxis.FontName = ftname;  % Set y-axis font name
+s.YAxis.FontAngle = 'italic';  % Apply italic style to y-axis labels for taxa names
+
+% Add 'b' label to upper left of first plot
+annotation('textbox', [0.25, 0.92, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+
+
+% Adjust figure size for publication (double-column width for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 2.8 6]);  % 7.16 inches width, height adjusted to fit
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v0_pt1.png");
+    print(gcf, '-dpdf', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v0_pt1.pdf");
+end
+
+
+
+
+
+
+
+
+
+
+
+%% Heatmap of Xcorr of variables 
+close all
+% Create a heatmap
+xmax=30;
+xmin=xmax*-1;
+taxa=ifcbbray.Properties.VariableNames([2:52,59]);
+taxa = strrep(taxa, '_', ' ');
+lag=lags(:,1);
+
+%Plotting 
+XLabels = lag;
+% Convert each number in the array into a string
+CustomXLabels = string(XLabels);
+% Replace all but the fifth elements by spaces
+CustomXLabels(mod(XLabels,xmax/10) ~= 0) = " ";
+% Set the 'XDisplayLabels' property of the heatmap 
+% object 'h' to the custom x-axis tick labels
+
+clf
+hBar=heatmap(lag,taxa,cc');
+xlim([-xmin,xmax])
+colorbar; % Add colorbar to show strength of coefficients
+title('Cross-correlation between PM 2.5 Anomaly and IFCB Phytoplankton Abundance');
+xlabel('Lag (days after PM 2.5 anomaly)');
+ylabel('Taxa')
+
+colormap('jet')
+caxis([0 0.8])
+xlim([0 28]);
+
+hBar.XDisplayLabels = CustomXLabels;
+hBar.GridVisible = 'off';
+
+% formatLOPublicationMaintainAspect('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\xcorr\','xcorr_heatmap_anomaly_pm2.5_final',{'pdf'})
+% Modify the underlying heatmap structure
+s = struct(hBar);
+s.XAxis.TickLabelRotation = 0;  % Set x-axis labels horizontal
+s.XAxis.FontSize = ftsz;  % Set x-axis font size
+s.XAxis.FontName = ftname;  % Set x-axis font name
+s.YAxis.FontSize = ftsz;  % Set y-axis font size
+s.YAxis.FontName = ftname;  % Set y-axis font name
+s.YAxis.FontAngle = 'italic';  % Apply italic style to y-axis labels for taxa names
+
+% Adjust figure size for publication (double-column width for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 9]);  % 7.16 inches width, height adjusted to fit
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+saving=0;
+if saving==1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\xcorr\xcorr_heatmap_anomaly_pm2.5_final.pdf");
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\xcorr\xcorr_heatmap_anomaly_pm2.5_final.png");
+end
+
+
+
+
+%% Absolute Abundance-select taxa
+% --- Filter Taxa based on Significant Adjusted P-values and CC >= 0.6 --- %
+
+% Load the previous table with significant taxa
+previous_table = readtable('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\tables\all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa;
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+% Filter taxa with max CC >= 0.6 and keep only those
+valid_taxa = significant_taxa(max_cc_values >= 0.6);  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 7, 1);
+end_date = datetime(2020, 11, 1);
+shade_start_date = datetime(2020, 8, 16);
+shade_end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+
+czu_date = datetime(2020, 8, 21);
+august_date = datetime(2020, 9, 11);
+shade_start = datetime(2020, 8, 16);
+shade_end = datetime(2020, 9, 22);
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+original_colors = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7   % Medium gray (for "Other Taxa")
+
+];
+
+% Add manually specified contrasting colors
+additional_colors = [
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    0.3, 0.7, 0.3;  % Deep Green
+];
+
+% Combine original and additional colors into a full colormap
+extended_color_map = [original_colors; additional_colors(1:(17-length(original_colors)), :)];
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2020, 7, 1) datetime(2020, 11, 1)]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 3]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+% Create the legend with all entries
+h = legend(legend_labels, 'Location', 'bestoutside', 'AutoUpdate', 'off', ...
+    'FontSize', ftsz, 'FontName', ftname);
+
+% Add 'a' label to upper left of first plot
+% annotation('textbox', [0.03, 0.91, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+5, 'FontName', ftname, 'LineStyle', 'none');
+
+% Modify labels explicitly (italicize all except the 2nd and last)
+modified_labels = legend_labels;
+for i = 1:length(modified_labels)
+    if i == 2 || i == length(modified_labels)
+        % Non-italic explicitly
+        modified_labels{i} = ['\rm ', legend_labels{i}];
+    else
+        % Italic explicitly
+        modified_labels{i} = ['\it ', legend_labels{i}];
+    end
+end
+
+% Create legend with interpreter enabled
+h = legend(hBar, modified_labels, 'Location', 'bestoutside', ...
+           'FontSize', ftsz, 'FontName', ftname, 'Interpreter', 'tex');
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    % Save as PNG
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.png');
+    
+    % Save as PDF
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.pdf');
+end
+
+%% PDF of Taxa that 'respond'
+
+
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green 
+];
+
+start_date = datetime(2020,8,16);
+end_date = datetime(2020,9,22);
+ifcb_2020_sel = ifcbbray(ifcbbray.datetime > start_date & ifcbbray.datetime < end_date,:);
+
+% Get unique categories from significant_results.Taxa
+valid_taxa = significant_taxa(max_cc_values >= 0.6);
+valid_taxa = strrep(valid_taxa, '*', '');  % Remove '*' from taxa names
+unique_taxa = unique(valid_taxa);
+
+num_rows = numel(unique_taxa);  % Number of rows for subplots
+num_cols = 1;
+ftsz=8;
+clf
+figure(3);
+
+% Define shared y-axis label
+shared_y_label = 'Probability Density';
+subplot_labels = {'\bf{b}','\bf{c}','\bf{d}','\bf{e}','\bf{f}','\bf{g}','\bf{h}'}; % labels for subplots
+
+
+for ii = 1:numel(unique_taxa)
+    % Extract data for the current category
+    current_category = unique_taxa{ii};
+    ifcbbray_dates_filt = ifcbbray(ifcbbray.datetime.Month >= start_date.Month & ifcbbray.datetime.Month <= end_date.Month & ...
+        ifcbbray.datetime.Day >= start_date.Day & ifcbbray.datetime.Day <= end_date.Day,:);
+    data_full = log10(ifcbbray_dates_filt.(current_category));
+    data_full = data_full(~isnan(data_full) & ~isinf(data_full));
+
+    [f_full, x_full] = ksdensity(data_full);  % PDF for the full dataset
+
+    % Create a subplot for the full dataset
+    subplot(num_rows, num_cols, ii);
+    plot(x_full, f_full, 'LineWidth', 1.5, 'Color', 'black', 'DisplayName', "August-October");
+    hold on;
+    area(x_full, f_full, 'FaceColor', 'black', 'FaceAlpha', 0.5);  % Fill under the curve
+    xlabel(['Log10(' current_category ')']);
+    title(['PDF for ' current_category ' (Full Dataset)']);
+
+    % Data within the specified window
+    data_window = log(ifcb_2020_sel.(current_category));
+    data_window = data_window(~isnan(data_window) & ~isinf(data_window));
+    [f_window, x_window] = ksdensity(data_window);
+
+    % Plot the windowed data
+    plot(x_window, f_window, 'LineWidth', 1.5, 'Color', colorz(ii, :));
+    area(x_window, f_window, 'FaceColor', colorz(ii, :), 'FaceAlpha', 0.7);  % Fill under the curve
+    
+    xlim([-5 20])
+    ylim([0 0.8])  % Set y-limits
+    if ii==numel(unique_taxa)
+        xlabel(['Ln cells L^{-1}']);
+    else
+        xlabel("")
+    end
+    if ii == 2
+        text(0.4, 0.95, current_category, ...
+             'Units', 'normalized', ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    else
+        text(0.4, 0.95, current_category, ...
+             'Units', 'normalized', ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'FontAngle', 'italic', ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    end
+    title("")
+    % Set four y-ticks from 0 to 0.8
+    yticks(linspace(0, 0.7, 3));
+
+    % Add bold lowercase letter to the top left corner of each subplot
+    text(min(xlim)-0.1*range(xlim), max(ylim)+0.5*range(ylim), subplot_labels{ii},...
+    'FontWeight','bold','FontSize',ftsz+2,'VerticalAlignment','top');
+
+    % Perform KS test
+    [~, p_values(ii)] = kstest2(data_full, data_window);
+
+    % Adjust axes properties
+    ax = gca;
+    ax.FontSize = ftsz;
+    ax.FontName = ftname;
+end
+
+% Add shared y-axis label using an invisible axis
+han = axes(figure(3), 'visible', 'off'); 
+han.YLabel.Visible = 'on';
+ylabel(han, shared_y_label,'FontWeight','bold');
+han.Position(2)= han.Position(2)-0.11;
+han.Position(1) = han.Position(1) - 0.05; % Shift further left
+
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+
+% Set the main title for the figure
+% sgtitle('Probability Density Function Comparison for Different Taxa');
+
+
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 2.2 6]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+saving=0;
+if saving==1
+% Save figure as high-res PNG
+print(gcf, '-dpng', '-r1200', ...
+    'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v0_pt2.png');
+
+% Save figure as high-res TIFF
+print(gcf, '-dtiff', '-r1200', ...
+    'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v0_pt2.tiff');
+
+% Save figure as high-res PDF
+print(gcf, '-dpdf', '-r1200', ...
+    'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v0_pt2.pdf');
+
+end
+
+
+% Output KS test results
+fprintf('Taxon\t\tP-value\n');
+for ii = 1:numel(unique_taxa)
+    fprintf('%s\t\t%f\n', unique_taxa{ii}, p_values(ii));
+end
+
+%% Combined Heatmap and PDF Plots Side-by-Side
+close all;
+
+subplot_labels = {'\bf{b}','\bf{c}','\bf{d}','\bf{e}','\bf{f}','\bf{g}','\bf{h}'};
+
+italic_taxa = {
+    'Akashiwo', 'Asterionellopsis','Boreadinium', 'Ceratium','Chaetoceros', ...
+    'Cochlodinium', 'Corethron', 'Cyl Nitz', ...
+    'Det Cer Lau', 'Dictyocha', 'Dinophysis', ...
+    'Ditylum', 'Entomoneis', 'Eucampia', ...
+    'Gymnodinium','Gyrodinium', 'Hemiaulus', 'Leptocylindrus', ...
+    'Peridinium','Phaeocystis', 'Polykrikos','Protocentrum','Protoperidinium', 'Pseudo nitzschia', ...
+    'Pyramimonas','Skeletonema', 'Thalassionema', 'Thalassiosira', ...
+    'Tiarina', 'Tontonia', 'Torodinium', ...
+    'Tropidoneis', 'Vicicitus'
+};
+
+
+
+ftsz = 8;
+figure('Units', 'inches', 'Position', [0, 0, 5, 6]);
+
+% --- Left plot: Heatmap using imagesc --- %
+subplot('Position', [0.22, 0.12, 0.42, 0.8]);  % Wider and aligned with PDFs
+
+imagesc(lags, 1:numel(taxa), data);
+colormap(jet);
+caxis([0, 0.8]);
+xlim([0 15]);
+
+% Taxa label formatting
+taxa_clean = strrep(taxa, '_', ' ');
+set(gca, 'YTick', 1:numel(taxa_clean));
+set(gca, 'YTickLabel', taxa_clean);
+
+% Italicize only taxa in italic_taxa
+set(gca, 'TickLabelInterpreter', 'tex');  % Switch from LaTeX back to default interpreter
+yticklabels = taxa_clean;
+
+for i = 1:numel(taxa_clean)
+    base_name = strrep(taxa_clean{i}, '*', '');
+    
+    if ismember(base_name, italic_taxa)
+        yticklabels{i} = ['\it ', taxa_clean{i}];  % TeX-style italics
+    end
+end
+
+set(gca, 'YTick', 1:numel(taxa_clean));
+set(gca, 'YTickLabel', yticklabels);
+set(gca, 'TickLabelInterpreter', 'tex');  % Use TeX, which respects \it
+set(gca, 'FontName', ftname);  % Restore your figure's font
+set(gca, 'FontSize', ftsz);  % Restore your figure's font
+
+
+% Axes styling
+ax = gca;
+ax.YAxis.FontSize = ftsz;
+ax.YAxis.FontName = ftname;
+ax.XAxis.FontSize = ftsz;
+ax.XAxis.FontName = ftname;
+ax.XTick = lags;
+ax.XTickLabelRotation = 0;
+ax.XTickLabels=CustomXLabels;
+xlabel('Lag (days after PM 2.5 anomaly)', 'FontSize', ftsz, 'FontName', ftname);
+
+% Top colorbar aligned with left plot
+cb = colorbar('Location', 'northoutside');
+cb.Position = [0.21, 0.93, 0.42, 0.015];
+cb.FontSize = ftsz;
+cb.FontName = ftname;
+
+cb.Label.String = '\it Cross correlation';  % Bold italic C
+cb.Label.FontSize = ftsz;
+cb.Label.FontName = ftname;
+cb.Label.Interpreter = 'tex';  % Use TeX for bold/italic formatting
+cb.Label.Rotation = 0;         % Keep horizontal
+cb.Label.HorizontalAlignment = 'center';
+cb.Label.VerticalAlignment = 'middle';
+
+% Shift label to the right of the colorbar
+% cb.Label.Position(1) = cb.Position(1) + cb.Position(3) + 0.1;  % x + width + small offset
+cb.Label.Position(2) = cb.Position(2)*4.5;    % slightly above vertical center
+
+% Subplot label 'a'
+annotation('textbox', [0.08, 0.92, 0.03, 0.05], ...
+           'String', '\bf{a}', ...
+           'FontSize', ftsz + 2, ...
+           'FontName', ftname, ...
+           'LineStyle', 'none', ...
+           'VerticalAlignment', 'bottom');
+
+
+% --- Right plot: PDFs --- %
+num_taxa = numel(unique_taxa);
+subplot_height = 0.8 / num_taxa;
+
+for ii = 1:num_taxa
+    subplot('Position', [0.68, 0.12 + (num_taxa - ii)*subplot_height, 0.2, subplot_height - 0.01]);
+
+    % Density for full dataset
+    data_full = log10(ifcbbray_dates_filt.(unique_taxa{ii}));
+    data_full = data_full(~isnan(data_full) & ~isinf(data_full));
+    [f_full, x_full] = ksdensity(data_full);
+    plot(x_full, f_full, 'LineWidth', 2, 'Color', 'black'); hold on;
+    area(x_full, f_full, 'FaceColor', 'black', 'FaceAlpha', 0.5);
+
+    % Density for windowed subset
+    data_window = log10(ifcb_2020_sel.(unique_taxa{ii}));
+    data_window = data_window(~isnan(data_window) & ~isinf(data_window));
+    [f_window, x_window] = ksdensity(data_window);
+    plot(x_window, f_window, 'LineWidth', 2, 'Color', colorz(ii, :));
+    area(x_window, f_window, 'FaceColor', colorz(ii, :), 'FaceAlpha', 0.7);
+
+    xlim([-2 8]);
+    ylim([0 0.9]);
+    yticks([0.3, 0.7]);
+
+    % Only add x-label to bottom plot
+    if ii == num_taxa
+        xlabel('Log_{10} cells L^{-1}', ...
+               'FontSize', ftsz, ...
+               'FontName', ftname);
+    else
+        set(gca, 'XTickLabel', []);  % Remove x-tick labels
+    end
+
+    % Taxa name (top-left inside plot)
+    x_text = min(xlim) + 0.02 * range(xlim);
+    y_text = min(ylim) + 0.95 * range(ylim);
+    if ismember(unique_taxa{ii}, italic_taxa)
+        text(x_text, y_text, unique_taxa{ii}, ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'FontAngle', 'italic', ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    else
+        text(x_text, y_text, unique_taxa{ii}, ...
+             'FontSize', ftsz, ...
+             'FontName', ftname, ...
+             'HorizontalAlignment', 'left', ...
+             'VerticalAlignment', 'top');
+    end
+
+    % Subplot label (outside top-left)
+    pos = get(gca, 'Position');
+    annotation('textbox', [pos(1) - 0.04, pos(2) + pos(4) - 0.005, 0.03, 0.03], ...
+               'String', subplot_labels{ii}, ...
+               'FontWeight', 'bold', ...
+               'FontSize', ftsz + 2, ...
+               'FontName', ftname, ...
+               'LineStyle', 'none', ...
+               'VerticalAlignment', 'top');
+
+    % Axes formatting
+    ax = gca;
+    ax.FontSize = ftsz;
+    ax.FontName = ftname;
+    ax.XAxisLocation = 'bottom';
+    ax.XTickLabelRotation = 0;
+    ax.XDir = 'normal';
+    ax.YAxisLocation = 'right';
+end
+
+% --- Shared y-axis label on right --- %
+han = axes(gcf, 'Visible', 'off', 'Position', [0.98, 0.14, 0.01, 0.76]);
+han.YLabel.Visible = 'on';
+ylabel(han, shared_y_label, ...
+       'FontWeight','bold', ...
+       'FontSize', ftsz, ...
+       'FontName', ftname, ...
+       'Rotation', -90, ...
+       'HorizontalAlignment', 'center', ...
+       'VerticalAlignment', 'bottom');
+
+% Export options
+set(gcf, 'PaperPositionMode', 'auto');
+
+saving=1;
+if saving==1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v1.png");
+    print(gcf, '-dpdf', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure5_v1.pdf");
+end
+
+%%
+clf
+figure;
+
+% Create a vertical layout: 1 row for heatmap + N rows for PDFs
+main_layout = tiledlayout('vertical', 'Padding', 'compact', 'TileSpacing', 'compact');
+
+% === Tile 1: Heatmap ===
+nexttile(main_layout, 1);
+hBar = heatmap(lags, taxa, all_cc', 'Colormap', jet, 'ColorLimits', [0, 0.8]);
+colorbar;
+xlabel('Lag (days after PM 2.5 anomaly)');
+ylabel('');
+hBar.XDisplayLabels = CustomXLabels;
+hBar.GridVisible = 'off';
+
+s = struct(hBar);
+s.XAxis.TickLabelRotation = 0;
+s.XAxis.FontSize = ftsz;
+s.XAxis.FontName = ftname;
+s.YAxis.FontSize = ftsz;
+s.YAxis.FontName = ftname;
+s.YAxis.FontAngle = 'italic';
+
+% === Tile 2: PDFs in sublayout ===
+nexttile(main_layout, 2);
+pdf_layout = tiledlayout(num_rows, num_cols, 'TileSpacing', 'compact', 'Padding', 'compact');
+shared_y_label = 'Probability Density';
+
+for ii = 1:numel(unique_taxa)
+    nexttile(pdf_layout, ii);
+
+    % (Same code for PDF generation and plotting)
+    ...
+end
+
+% Shared y-label
+han = axes(gcf, 'visible', 'off');
+han.YLabel.Visible = 'on';
+ylabel(han, shared_y_label, 'FontWeight', 'bold');
+han.Position(1) = han.Position(1) - 0.05;
+
+% Adjust figure size for publication
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5.5, 8]);  % Adjust width and height as needed
+set(gcf, 'PaperPositionMode', 'auto');
+
+%% Absolute Abundance-all significant taxa
+
+% --- Filter Taxa based on Significant Adjusted P-values and CC >= 0.6 --- %
+
+% Load the previous table with significant taxa
+% previous_table = readtable('all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa(previous_table.Adjusted_p_value < 0.05);
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+valid_taxa = significant_taxa;  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 7, 1);
+end_date = datetime(2020, 11, 1);
+shade_start_date = datetime(2020, 8, 16);
+shade_end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+
+czu_date = datetime(2020, 8, 21);
+august_date = datetime(2020, 9, 11);
+shade_start = datetime(2020, 8, 16);
+shade_end = datetime(2020, 9, 22);
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+extended_color_map = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    % 0.3, 0.7, 0.3;  % Deep Green
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7];   % Medium gray (for "Other Taxa")
+
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2020, 7, 1) datetime(2020, 11, 1)]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Modify labels explicitly (italicize all except the 2nd and last)
+modified_labels = legend_labels;
+for i = 1:length(modified_labels)
+    if i == 2 ||i==4 || i== 5|| i== 7|| i== 10|| i == length(modified_labels)
+        % Non-italic explicitly
+        modified_labels{i} = ['\rm ', legend_labels{i}];
+    else
+        % Italic explicitly
+        modified_labels{i} = ['\it ', legend_labels{i}];
+    end
+end
+
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+legend(modified_labels, 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 4]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_community_composition_all_taxa_absolute.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_community_composition_all_taxa_absolute.pdf');
+end
+
+
+
+
+
+%% Plot IFCB Community Composition with Helvetica Font Size 10 and Adjusted Dimensions for Publication
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 7, 1);
+end_date = datetime(2020, 11, 1);
+shade_start_date = datetime(2020, 8, 16);
+shade_end_date = datetime(2020, 9, 22);
+lag_date = datetime(2020, 8, 21 + lag_days);
+
+czu_date = datetime(2020, 8, 21);
+
+august_date = datetime(2020, 9, 11);
+shade_start = datetime(2020,8,16);
+shade_end = datetime(2020,9,22);
+
+% Select taxa
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, significant_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+
+% Create a colormap with distinct and contrasting colors for each unique group
+num_groups = length(significant_indices) + 1;  % Including 'Other Taxa'
+new_color_map = distinguishable_bright_colors(num_groups);  % Generate a colormap with distinct colors
+
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green 
+];
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2020,4,1) datetime(2020,6,1)]);  % Adjust as necessary
+
+% Apply custom color map with default color for 'Other Taxa'
+new_color_map = [colorz(1:length(significant_indices), :); defaultColor];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every five days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a legend excluding datetime
+legend(new_variable_names(1:end-1), 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+% line_dates = [datetime(2020, 8, 18), datetime(2020, 9, 22)];
+line_heights = [1, 1];
+% bar(line_dates, line_heights, 'BarWidth', 0.0005, 'FaceColor', 'k', 'EdgeColor', 'none');
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 4]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_community_composition_select_taxa_absolute.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_community_composition_select_taxa_absolute.pdf');
+end
+
+
+
+%% Total cell plot
+
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+close all;
+plot(ifcb_ucsc_all_mean.datetime(ifcb_ucsc_all_mean.datetime.Year>=2020),ifcb_ucsc_all_mean.total_cells(ifcb_ucsc_all_mean.datetime.Year>=2020))
+xlim([start_date end_date])
+datetick('x')
+ylabel(['Cells /L']);
+title('Total Cells');
+hold on
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(peak_fire, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(august_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+ylim([0 3e6])
+xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+
+
+%% Time series of taxa
+
+valid_taxa=sort(valid_taxa);
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green 
+    0.3, 0.7, 0.6   % Soft blue-green
+];
+
+% Define the time range for the plot
+start_date = datetime(2016, 1, 1);  % Start of the time series
+end_date = datetime(2023, 12, 31);  % End of the time series
+
+% Extract unique taxa
+unique_taxa=valid_taxa;
+unique_taxa{end+1} = {'total_cells'};
+
+% Create a figure for the 7-panel plot
+figure;
+clf;
+num_panels = numel(unique_taxa)-1;  % Number of taxa (panels)
+
+% Set publication settings
+ftsz = 10;  % Font size
+ftname = 'Helvetica';  % Font name
+linewdt = 3;  % Line width for plot elements
+colorz = lines(num_panels);  % Generate distinct colors for each taxon
+
+% Arrange the plots in a single column
+panel_rows = num_panels;
+panel_cols = 1;  % Single column layout
+
+taxon_data=ifcbbray(:, [2:52,59]);
+total_abundance=taxon_data.total_cells;
+
+% Loop through each taxon to create subplots
+for ii = 1:num_panels
+    current_taxon = unique_taxa{ii};
+    
+    % Filter data for the current taxon and time range
+    taxon_data = ifcbbray(ifcbbray.datetime >= start_date & ifcbbray.datetime <= end_date, :);
+    abundance = (taxon_data.(current_taxon));  % Log10 of abundance
+    dates = taxon_data.datetime;  % Extract corresponding dates
+
+    % Remove NaNs and Infs
+    valid_indices = ~isnan(abundance) & ~isinf(abundance);
+    abundance = abundance(valid_indices);
+    dates = dates(valid_indices);
+    
+    % Apply a 7-day moving mean
+    moving_mean_abundance = movmean(abundance, 7);
+    moving_mean_total_cells=movmean(total_abundance,7);
+
+    % Insert NaNs for missing dates (gaps)
+    full_dates = start_date:end_date;  % Full date range
+    [~, date_idx] = ismember(dates, full_dates);
+    moving_mean_full = NaN(size(full_dates));
+    moving_mean_full(date_idx) = moving_mean_abundance;  % Map moving mean to full date range
+
+    moving_mean_full_total = NaN(size(full_dates));
+    moving_mean_full_total(date_idx) = moving_mean_total_cells;  % Map moving mean to full date range
+    
+    % Create subplot for the current taxon
+    subplot(panel_rows, panel_cols, ii);
+
+    yyaxis right
+    plot(full_dates, moving_mean_full_total,'LineStyle',':', 'LineWidth', linewdt-1, 'Color', [0.6 0.6 0.6]);
+
+    yyaxis left
+    plot(full_dates, moving_mean_full, 'LineWidth', linewdt, 'Color', colorz(ii, :));
+    % ylim([0 2e6])
+    
+    xlim([taxon_data.datetime(1) taxon_data.datetime(end)])
+
+    % Format subplot
+    if ii == num_panels  % Only label x-axis on the last plot
+        xlabel('Time');
+    else
+        set(gca, 'XTickLabel', []);  % Remove x-axis labels for intermediate subplots
+    end
+    title(current_taxon);
+    datetick('x', 'yyyy', 'keeplimits');  % Format x-axis as years
+    
+    grid on;
+end
+
+
+% Apply publication settings to all axes
+for ii = 1:num_panels
+    subplot(panel_rows, panel_cols, ii);
+    ax = gca;
+    ax.FontSize = ftsz;
+    ax.FontName = ftname;
+end
+
+% Create an invisible axis for the shared label (for yyaxis left)
+han_left = axes(gcf, 'visible', 'off');
+han_left.YLabel.Visible = 'on';
+
+% Move the left y-axis label further to the left by adjusting 'Position' property
+ylabel(han_left, 'Taxon Abundance [Cells L^{-1}]', 'FontSize', ftsz+2, 'FontName', ftname, 'FontWeight', 'bold');
+set(get(han_left, 'YLabel'), 'Position', [-0.08, 0.5, 0], 'VerticalAlignment', 'bottom');
+
+% Create another invisible axis for the shared label (for yyaxis right)
+han_right = axes(gcf, 'visible', 'off');
+han_right.YLabel.Visible = 'on';
+
+% Move the right y-axis label further to the right by adjusting 'Position' property
+ylabel(han_right, 'Total Abundance [Cells L^{-1}]', 'FontSize', ftsz+2, 'FontName', ftname, 'FontWeight', 'bold', 'Rotation', 270);
+set(get(han_right, 'YLabel'), 'Position', [1.07, 0.5, 0], 'VerticalAlignment', 'bottom');
+
+% Adjust figure size for publication (single column, large enough to see all panels)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches wide, taller for 7 panels
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\taxa_time_series\7_panel_taxa_timeseries_single_column.png');
+    print(gcf, '-dpdf', '-r1200',  'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\taxa_time_series\7_panel_taxa_timeseries_single_column.pdf');
+end
+
+
+%% Examine taxa growth rates over time
+close all
+% Extract the significant taxa and calculate growth rates
+datetime_column = {'datetime'};  % Assuming datetime column is called 'datetime'
+significant_taxa_data = ifcb_pm25(:, [datetime_column, valid_taxa']);
+significant_taxa_growth = growth_rate(significant_taxa_data, datetime_column);
+
+% Extract the growth rate columns
+growth_rate_columns = significant_taxa_growth.Properties.VariableNames(contains(significant_taxa_growth.Properties.VariableNames, '_growthrate'));
+
+% Prepare for plotting
+hold on;
+colors = lines(length(growth_rate_columns)); % Generate distinct colors for each taxon
+start_date = datetime(2020, 7, 1);
+end_date = datetime(2020, 11, 1);
+
+% Create a new figure
+
+% Initialize subplots
+subplot(2, 1, 1); % First subplot for 'Centric_growthrate'
+centric_index = find(strcmp(growth_rate_columns, 'Centric_growthrate'));
+
+% Plot for 'Centric_growthrate'
+if ~isempty(centric_index)
+    plot(significant_taxa_growth.datetime, ...
+         movmean(significant_taxa_growth{:, growth_rate_columns{centric_index}}, 7, 1, 'omitmissing'), ...
+         'LineWidth', 2, 'DisplayName', 'Centric Growth Rate', ...
+         'Color', colors(centric_index, :));
+    hold on;
+
+    % Add horizontal line at y = 0
+    yline(0, 'k', 'LineWidth', 1.5, 'LineStyle', '--'); % Adds a horizontal line at y = 0, in black ('k')
+
+    % Labels and formatting
+    ylabel('Growth Rate (ln(A_{t+1}/A_t))');
+    title('Growth Rate: Centric with 7-day moving mean');
+    xlim([start_date end_date]);
+    ylim([-1 1])
+    ax = gca;
+    ax.FontSize = 12; % Adjust the font size for readability
+
+    % Add lines for 6 day lag and August Fire Smoke
+    % xline(peak_fire, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+    xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+    xline(august_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+    
+    xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+    fill([shade_start, shade_start, shade_end, shade_end], ...
+         [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+         [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+    xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+end
+
+% Second subplot for all other taxa
+subplot(2, 1, 2); % Second subplot for the rest of the taxa
+hold on;
+for i = 1:length(growth_rate_columns)
+    if ~strcmp(growth_rate_columns{i}, 'Centric_growthrate')
+        % Plot for other taxa
+        plot(significant_taxa_growth.datetime, ...
+             movmean(significant_taxa_growth{:, growth_rate_columns{i}}, 1, 1, 'omitmissing'), ...
+             'LineWidth', 2, 'DisplayName', strrep(growth_rate_columns{i}, '_growthrate', ''), ...
+             'Color', colors(i, :));
+        hold on
+    end
+end
+
+
+% Add lines for 6 day lag and August Fire Smoke
+% Turn off legend auto-update to avoid adding elements like the fill to the legend
+legend('AutoUpdate', 'off');
+
+% Add horizontal line at y = 0
+yline(0, 'k', 'LineWidth', 1.5, 'LineStyle', '--'); % Adds a horizontal line at y = 0, in black ('k')
+
+% xline(peak_fire, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+% xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+% xline(august_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+% 
+% xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+% fill([shade_start, shade_start, shade_end, shade_end], ...
+%      [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+%      [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+% xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+
+% Labels and formatting
+ylabel('Growth Rate (ln(A_{t+1}/A_t))');
+xlabel('Date');
+title('Growth Rates of Other Significant Taxa with 7-day moving mean');
+xlim([start_date end_date]);
+ylim([-1 5])
+legend('show', 'Location', 'northeast','AutoUpdate','off');
+ax = gca;
+ax.FontSize = 12; % Adjust the font size for readability
+
+
+
+% Save the figure if required
+set(gcf, 'Position', [0 0 1600 1000]);
+saving = 1;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\growth_rates\growth_rates_significant_taxa.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\growth_rates\growth_rates_significant_taxa.png");
+end
+
+
+%% Functions
+function taxa_table = growth_rate(taxa_table, datetime_column)
+    % Function to calculate growth rate for each taxa in the table
+    % taxa_table: input table with taxa abundances
+    % datetime_column: the name of the datetime column in the table
+    
+    % Sort the table by the datetime column (to ensure chronological order)
+    taxa_table = sortrows(taxa_table, datetime_column);
+    
+    % Get the list of taxa columns (exclude the datetime column)
+    taxa_names = taxa_table.Properties.VariableNames;
+    taxa_names(strcmp(taxa_names, datetime_column)) = [];
+    
+    % Extract datetime information as a datetime array
+    datetimes = table2array(taxa_table(:, datetime_column));
+    
+    % Iterate over each taxa column
+    for i = 1:length(taxa_names)
+        taxa_name = taxa_names{i};
+        
+        % Extract the taxa values as an array
+        taxa_values = table2array(taxa_table(:, taxa_name));
+        
+        % Initialize growth rate with NaN values
+        growth_rates = NaN(size(taxa_values));
+        
+        % Calculate growth rate for each consecutive time step
+        for t = 2:length(taxa_values)
+            if days(datetimes(t) - datetimes(t-1)) == 1  % Ensure time difference is exactly 1 day
+                if taxa_values(t-1) > 0  % To avoid division by zero or negative rates
+                    growth_rates(t) = log(taxa_values(t) / taxa_values(t-1));
+                end
+            end
+        end
+        
+        % Append growth rate column with the suffix '_growthrate'
+        taxa_table.([taxa_name, '_growthrate']) = growth_rates;
+    end
+end
+
+
+%% --- Helper Function: Fourier Surrogate Generation --- %
+
+
+
+% %SCRAP
+% %% Plotting the results for significant taxa
+% 
+% figure;
+% 
+% subplot(2,1,1); % Lower plot for time series data
+% hold on;
+% 
+% start_date = datetime(2020, 7, 1);
+% end_date = datetime(2020, 11, 1);
+% 
+% yyaxis left;
+% colors_95 = lines(length(significant_taxa));
+% 
+% for k = 1:length(significant_taxa)
+%     taxa_data = ifcb_pm25.(significant_taxa{k});
+%     plot(ifcb_pm25.date, taxa_data, 'DisplayName', significant_taxa{k}, 'LineWidth', 2, 'LineStyle', '-', 'Color', colors_95(k, :));
+%     ylabel('Abundance');
+% end
+% 
+% yyaxis right;
+% pm25_plot = plot(ifcb_pm25.date, fillmissing(pm25, 'linear'), 'DisplayName', 'PM 2.5', 'LineStyle', '-', 'LineWidth', 2, 'Color', 'k');
+% ylabel('PM 2.5');
+% 
+% title('Time Series Data for Significant Taxa');
+% legend('show', 'Location', 'best');
+% datetick('x', 'yyyy-mm-dd', 'keeplimits', 'keepticks');
+% xlim([start_date end_date]);
+% 
+% shade_start = datetime(2020,8,16);
+% shade_end = datetime(2020,9,22);
+% hold on;
+% yyaxis right;
+% fill([shade_start, shade_start, shade_end, shade_end], [0, max(ylim) * 1.1, max(ylim) * 1.1, 0], [0, 0.8, 0.6], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+% 
+% legend(flipud(findobj(gca, 'Type', 'Line')), 'Location','eastoutside');
+% 
+% ax = gca;
+% ax.XTick = start_date:calmonths(1):end_date;
+% datetick('x', 'mmm yyyy', 'keeplimits', 'keepticks');
+% 
+% subplot(2,1,2); % Upper plot for cross-correlations
+% hold on;
+% 
+% for k = 1:length(plot_data)
+%     plot(plot_data{k}.lags, plot_data{k}.cc, 'DisplayName', plot_data{k}.label, 'LineWidth', 2);
+% end
+% xlim([-50 50]);
+% ylim([0 0.8]);
+% title('Cross-Correlation between AOD 500nm and Significant Phytoplankton Groups');
+% xlabel('Lags (Days after AOD anomaly)');
+% ylabel('Normalized Cross-correlation');
+% legend('show', 'Location','eastoutside');
+% 
+% set(gcf, 'Position', [0, 0, 1600, 900]);
+% 
+% saving = 0;
+% if saving == 1
+%     saveas(gcf, "xcorr_time_series_plot.png");
+% end
+
+% %% Cross correlation 
+% % 
+% %Initialize variables to store coefficients and lags
+% cc = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));
+% lags = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));
+% 
+% plotting = 1; % Assuming you want to plot
+% % Loop through each taxon
+% for i = 1:size(taxa_data, 2)
+%     % Cross-correlation
+%     [cc(:, i), temp_lags] = xcorr(ifcb_pm25{:, taxa{i}},fillmissing(pm25, 'linear'), 'coeff');
+% 
+%     lags(:, i) = temp_lags;
+%     plotting=0;
+%     if plotting == 1
+%         figure(1);
+%         plot(lags(:, i), cc(:, i), 'LineStyle', '-', 'LineWidth', 2);
+%         hold on;
+%         title("Cross-correlation between AOD 500nm & Phytoplankton Groups");
+%         xlabel('Lags (Days)');
+%         ylabel('Normalized Cross-correlation');
+%         xlim([-100, 100]);
+%     end
+% end
+
+

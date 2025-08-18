@@ -1,0 +1,1092 @@
+%% Bray analysis from R
+
+addpath('Q:\Dante\data\MB_Wildfire_Obs\processed_data')
+ftsz=24;
+
+% Load the data
+ifcb_mean = load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_ucsc_all_mean.mat');
+ifcb_mean=ifcb_ucsc_all_mean;
+
+%% Convert datetime column to proper date format
+clear year %in case accidentally defined as a variable
+ifcb_mean.datetime = datetime(ifcb_mean.datetime, 'InputFormat', 'dd-MMM-yyyy HH:mm:ss');
+ifcb_mean.date = dateshift(ifcb_mean.datetime, 'start', 'day');
+ifcb_mean.year = year(ifcb_mean.datetime);  % Extract the year for coloring
+
+
+% Extract numerical columns (excluding "datetime" and "date" columns)
+numerical_columns = ifcb_mean.Properties.VariableNames;
+numerical_columns = numerical_columns(~ismember(numerical_columns, {'datetime', 'date'}));
+
+% Initialize an empty table to store pairwise differences
+pairwise_table = table([], [], [], [], 'VariableNames', {'pair_index1', 'pair_index2', 'pair_date2', 'pairwise_bray'});
+
+days_to_diff=6;
+% Compute Bray-Curtis dissimilarity for rows 6 days apart
+for i = 1:height(ifcb_mean)
+    % Find rows that are exactly 6 days apart from the current row
+    exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+    j_indices = find(ifcb_mean.date == exact_days_later);
+    
+    for j = j_indices'
+        % Calculate Bray-Curtis dissimilarity for the pair
+        dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                        sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+        
+        % Add results to the table
+        pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(j), dissimilarity}];
+    end
+end
+
+
+%%
+
+pairwisebraydaylag=pairwise_table;
+% load('pairwise_bray__day_lag.mat')
+pairwisebraydaylag.datetime=pairwisebraydaylag.pair_date2;
+pairwisebraydaylag.dayOfYear=day(pairwisebraydaylag.datetime,'dayofyear');
+
+
+start_date=datetime(2016,7,1);
+end_date=datetime(2020,10,1);
+
+start_date=datenum(datetime(2020,5,1));
+end_date=datenum(datetime(2020,12,1));
+
+bray_lag_climatology=climatology(pairwisebraydaylag,'pairwise_bray');
+
+pairwisebraydaylag_anom=join(pairwisebraydaylag,bray_lag_climatology,'Keys','dayOfYear');
+pairwisebraydaylag_anom.anomaly=pairwisebraydaylag_anom.pairwise_bray-pairwisebraydaylag_anom.pairwise_bray_climatology;
+pairwisebraydaylag_anom = sortrows(pairwisebraydaylag_anom, 'datetime');
+
+
+
+%% Bray max lag day PDF
+
+optimal_lags=[1,6];
+
+days_to_diff=optimal_lags(1);
+% Compute Bray-Curtis dissimilarity for rows 6 days apart
+for i = 1:height(ifcb_mean)
+    % Find rows that are exactly 6 days apart from the current row
+    exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+    j_indices = find(ifcb_mean.date == exact_days_later);
+    
+    for j = j_indices'
+        % Calculate Bray-Curtis dissimilarity for the pair
+        dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                        sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+        
+        % Add results to the table
+        pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(i), dissimilarity}];
+    end
+end
+pairwisebraydaylag=pairwise_table;
+% load('pairwise_bray__day_lag.mat')
+pairwisebraydaylag.datetime=pairwisebraydaylag.pair_date2;
+pairwisebraydaylag.dayOfYear=day(pairwisebraydaylag.datetime,'dayofyear');
+
+
+start_date=datetime(2016,7,1);
+end_date=datetime(2020,10,1);
+
+start_date=datenum(datetime(2020,5,1));
+end_date=datenum(datetime(2020,12,1));
+
+bray_lag_climatology=climatology(pairwisebraydaylag,'pairwise_bray');
+
+pairwisebraydaylag_anom=join(pairwisebraydaylag,bray_lag_climatology,'Keys','dayOfYear');
+pairwisebraydaylag_anom.anomaly=pairwisebraydaylag_anom.pairwise_bray-pairwisebraydaylag_anom.pairwise_bray_climatology;
+pairwisebraydaylag_anom = sortrows(pairwisebraydaylag_anom, 'datetime');
+
+
+
+% Prepare data for the specific anomaly variable
+anomaly_data = pairwisebraydaylag_anom.pairwise_bray;
+anomaly_dates = pairwisebraydaylag_anom.datetime;
+
+% Define the date range
+startDate = datetime('2020-08-16');
+endDate = datetime('2020-09-4');
+
+% Identify indices for the specified date range
+extreme_idx_90 = (anomaly_dates >= startDate) & (anomaly_dates <= endDate);
+
+% Remove NaNs and Infs
+valid_idx = ~isnan(anomaly_data) & ~isinf(anomaly_data);
+anomaly_data = anomaly_data(valid_idx);
+anomaly_dates = anomaly_dates(valid_idx);
+
+% Extract the relevant data
+extreme_data = anomaly_data(extreme_idx_90);
+extreme_dates = anomaly_dates(extreme_idx_90);
+
+% Normalize the dates to a range suitable for coloring
+date_nums = datenum(extreme_dates);
+date_range = linspace(min(date_nums), max(date_nums), numel(date_nums));
+colors_95 = hot(numel(date_range));  % 'jet' colormap ranges from blue to red
+
+% Clear the figure and set up plotting
+clf
+figure(3);
+
+% Plot the PDF for all data
+[f_anomaly, x_anomaly] = ksdensity(anomaly_data);
+plot(x_anomaly, f_anomaly, 'LineWidth', 2, 'Color', 'black', 'DisplayName', 'All Data');
+hold on;
+area(x_anomaly, f_anomaly, 'FaceColor', 'black', 'FaceAlpha', 0.3); % Fill under the curve
+
+% Extract the relevant data
+extreme_data = anomaly_data(extreme_idx_90);
+extreme_dates = anomaly_dates(extreme_idx_90);
+
+% Interpolate the PDF values at the data points
+y_values = interp1(x_anomaly, f_anomaly, extreme_data, 'pchip');
+
+% Normalize the dates to a range suitable for coloring
+date_nums = datenum(extreme_dates);
+colors_95 = hot(numel(date_nums));  % Generate colors based on the date range
+date_range = linspace(min(date_nums), max(date_nums), numel(date_nums));
+colors_95 = hot(numel(date_range));  % 'jet' colormap ranges from blue to red
+
+% Plot the relevant points on the PDF line with gradient colors
+scatter(extreme_data, y_values, 60, colors_95, 'filled');
+hold on
+% Add labels for the relevant points with rotated text
+for i = 1:length(extreme_data)
+    if i==1
+        nudge=0;
+    end
+    nudge=0.028+nudge;
+    text(extreme_data(i), y_values(i)+0.05, datestr(extreme_dates(i), 'mm/dd/yyyy'), ...
+        'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left', 'FontSize', 12, 'Rotation', 45);
+end
+
+% Customize the plot
+xlabel(['Bray Curtis Index (', num2str(days_to_diff), '-day difference)']);
+ylabel('Probability Density');
+title('PDF for Bray Curtis Index');
+grid on;
+
+% Calculate the 95% confidence intervals for both distributions
+ci_anomaly_95 = prctile(anomaly_data, [2.5, 97.5]);
+
+% Plot vertical lines for the 95% confidence intervals for the anomaly data
+line([ci_anomaly_95(1), ci_anomaly_95(1)], ylim, 'Color', 'black', 'LineStyle', '--', 'LineWidth', 1);
+line([ci_anomaly_95(2), ci_anomaly_95(2)], ylim, 'Color', 'black', 'LineStyle', '--', 'LineWidth', 1);
+
+% Format the figure
+set(gcf, 'Position', [0,0, 1600, 800]);
+
+% Show plot
+hold off;
+
+saving=0;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_9_day_pdf.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_9_day_pdf.pdf"]);
+
+end
+
+%% Make PDFs of all the significant lags (excluding centric because it co-occured)
+
+% Clear figure and set up a new figure
+clf;
+% figure(3);
+set(gcf, 'Position', [-100, 1000, 1600, 800]);
+set(gcf, 'Position', [0,0, 1600, 800]);
+
+% Define optimal lags and the initial setup
+optimal_lags = [6];
+start_date = datetime(2020, 8, 20);
+end_date = datetime(2020, 8, 30);
+start_date_num = datenum(start_date);
+end_date_num = datenum(end_date);
+
+% Loop through each optimal lag
+for idx = 1:length(optimal_lags)
+    days_to_diff = optimal_lags(idx);
+    if length(optimal_lags) >1
+        subplot(length(optimal_lags), 2, idx); % Setup subplot
+    end
+    % Calculate dissimilarity and filter by dates
+    % This assumes ifcb_mean and pairwise_table are predefined and set up correctly
+    pairwise_table = table([], [], [], [], 'VariableNames', {'Index1', 'Index2', 'PairDate', 'Dissimilarity'});
+    for i = 1:height(ifcb_mean)
+        exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+        j_indices = find(ifcb_mean.date == exact_days_later);
+        for j = j_indices'
+            dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                            sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+            pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(i), dissimilarity}];
+        end
+    end
+
+    % Prepare anomaly data
+    pairwise_table.Properties.VariableNames = {'Index1', 'Index2', 'datetime', 'pairwise_bray'};
+    anomaly_data = pairwise_table.pairwise_bray;
+    anomaly_dates = pairwise_table.datetime;
+    valid_idx = ~isnan(anomaly_data) & ~isinf(anomaly_data);
+    anomaly_data = anomaly_data(valid_idx);
+    anomaly_dates = anomaly_dates(valid_idx);
+
+
+
+    % Calculate the 95% confidence intervals for both distributions
+    ci_anomaly_95 = prctile(anomaly_data, [2.5, 97.5]);
+
+    extreme_idx_95 = (anomaly_dates >= start_date) & (anomaly_dates <= end_date) & (anomaly_data >= ci_anomaly_95(2));
+    extreme_data_95 = anomaly_data(extreme_idx_95);
+    extreme_dates_95 = anomaly_dates(extreme_idx_95);
+
+
+    ci_anomaly_90 = prctile(anomaly_data, [49.9 50.1]);
+
+    extreme_idx_90 = (anomaly_dates >= start_date) & (anomaly_dates <= end_date) & (anomaly_data >= ci_anomaly_90(2))& (anomaly_data <= ci_anomaly_95(2));
+    extreme_data_90 = anomaly_data(extreme_idx_90);
+    extreme_dates_90 = anomaly_dates(extreme_idx_90);
+
+
+
+    % Estimate PDF and plot
+    [f_anomaly, x_anomaly] = ksdensity(anomaly_data, 'Bandwidth',0.1);
+    plot(x_anomaly, f_anomaly, 'LineWidth', 2, 'Color', 'black');
+    hold on;
+    area(x_anomaly, f_anomaly, 'FaceColor', 'black', 'FaceAlpha', 0.3);
+
+    % Plot points on PDF
+    y_values_95 = interp1(x_anomaly, f_anomaly, extreme_data_95, 'pchip');
+    y_values_90 = interp1(x_anomaly, f_anomaly, extreme_data_90, 'pchip');
+
+
+    % Normalize the dates to a range suitable for coloring
+    date_nums = datenum(extreme_dates_95);
+    colors_95 = hot(numel(date_nums));  % Generate colors based on the date range
+    date_range = linspace(min(date_nums), max(date_nums), numel(date_nums));
+    colors_95 = hot(numel(date_range));  % 'jet' colormap ranges from blue to red
+
+    date_nums = datenum(extreme_dates_90);
+    colors_90 = hot(numel(date_nums));  % Generate colors based on the date range
+    date_range = linspace(min(date_nums), max(date_nums), numel(date_nums));
+    colors_90 = fliplr(hot(numel(date_range)));  % 'jet' colormap ranges from blue to red
+    
+    % Plot the relevant points on the PDF line with gradient colors
+    scatter(extreme_data_95, y_values_95, 60, colors_95, 'filled');
+    hold on
+    scatter(extreme_data_90, y_values_90, 60, colors_90, 'filled');
+
+    
+% Plot vertical lines for the 95% confidence intervals for the anomaly data
+line([ci_anomaly_95(1), ci_anomaly_95(1)], ylim, 'Color', '#ed5f55', 'LineStyle', '--', 'LineWidth', 1);
+line([ci_anomaly_95(2), ci_anomaly_95(2)], ylim, 'Color', '#ed5f55', 'LineStyle', '--', 'LineWidth', 1);  
+text(ci_anomaly_95(2)+0.03, max(ylim) - (max(ylim) - min(ylim)) * 0.1, '95%', ...
+     'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 10, 'Color', '#ed5f55');
+
+% Plot vertical lines for the 90% confidence intervals for the anomaly data
+line([ci_anomaly_90(1), ci_anomaly_90(1)], ylim, 'Color', '#fab23e', 'LineStyle', '--', 'LineWidth', 1);
+line([ci_anomaly_90(2), ci_anomaly_90(2)], ylim, 'Color', '#fab23e', 'LineStyle', '--', 'LineWidth', 1);  
+text(ci_anomaly_90(2)+0.03, max(ylim) - (max(ylim) - min(ylim)) * 0.05, '90%', ...
+     'HorizontalAlignment', 'left', 'VerticalAlignment', 'top', 'FontSize', 10,'Color', '#fab23e'); 
+
+    % Add labels for the relevant points with rotated text
+    % for i = 1:length(extreme_data_95)
+    %     if i==1
+    %         nudge=0;
+    %     end
+    %     nudge=0.05+nudge;
+    %     text(extreme_data_95(1)-0.01+nudge, y_values_95(i)+0.05, datestr(extreme_dates_95(i), 'mm/dd/yyyy'), ...
+    %         'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left', 'FontSize', 12, 'Rotation', 45);
+    % end
+    % 
+    % for i = 1:length(extreme_data_90)
+    %     if i==1
+    %         nudge=0;
+    %     end
+    %     nudge=0.05+nudge;
+    %     text(extreme_data_90(1)-0.01+nudge, y_values_90(i)+0.05, datestr(extreme_dates_90(i), 'mm/dd/yyyy'), ...
+    %         'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'left', 'FontSize', 12, 'Rotation', 45);
+    % end
+
+
+    % Get union of extreme data points for even spacing of labels
+    combined_data = [extreme_data_95; extreme_data_90];
+    combined_dates = [extreme_dates_95; extreme_dates_90];
+    [combined_data, sort_indices] = sort(combined_data); % Sort by value
+    combined_dates = combined_dates(sort_indices);
+
+
+    % Calculate the y-values for plotting
+    y_values_combined = interp1(x_anomaly, f_anomaly, combined_data, 'pchip');
+
+    % Define horizontal offset for labels
+    min_x = min(combined_data);
+    max_x = max(combined_data);
+    if optimal_lags(idx) == 0
+        x_spacing = [min_x, min_x+0.05,max_x];
+    elseif optimal_lags(idx) > 5
+        x_spacing = linspace(min_x, max_x+0.25*max_x, length(combined_data));
+    else
+        x_spacing = linspace(min_x, max_x+0.15*max_x, length(combined_data));
+    end
+
+    % Add labels evenly spaced out and above the line
+    label_y_offset = 0.1; % Offset above the line by 10% of max y-value
+    for i = 1:length(combined_data)
+        text(x_spacing, y_values_combined + label_y_offset, datestr(combined_dates, 'dd mmm yyyy'), ...
+            'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'center', 'FontSize', 16, 'Rotation', 30);
+    end
+
+    % Customize the subplot
+    xlabel(['Bray Curtis Index (', num2str(days_to_diff), '-day difference)']);
+    ylabel('Probability Density');
+    title(['PDF for Bray Curtis Index with ', num2str(days_to_diff), ' days lag']);
+    grid on;
+
+    % Confidence intervals and other formatting can be added here if necessary
+
+    hold off; % End of plotting for this subplot
+end
+
+set(gca, 'FontSize', ftsz)  % Set x-tick label size
+
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_5_pt1_v0.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_5_pt1_v0.pdf"]);
+
+end
+
+
+
+%% Time series of the bray-curtis differences with top 5% anomaly dates plotted and labeled for the 8 day lag
+% and see which of the extreme changes also occurred for more than 3 days in sequence
+
+% Clear figure and set up a new figure
+clf;
+figure;
+% set(gcf, 'Position', [-100, 1000, 1600, 800]);
+
+% Define optimal lags and the initial setup
+optimal_lags = [6];
+start_date = datetime(2016, 1, 1);
+end_date = datetime(2023, 12, 30);
+% start_date_num = datenum(datetime(2020, 5, 1));
+% end_date_num = datenum(datetime(2020, 12, 1));
+
+% Loop through each optimal lag
+for idx = 1:length(optimal_lags)
+    days_to_diff = optimal_lags(idx);
+
+    % Calculate dissimilarity and filter by dates
+    pairwise_table = table([], [], [], [], [], 'VariableNames', {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'Dissimilarity'});
+    for i = 1:height(ifcb_mean)
+        exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+        j_indices = find(ifcb_mean.date == exact_days_later);
+        for j = j_indices'
+            dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                            sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+            pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(i), ifcb_mean.date(j), dissimilarity}];
+        end
+    end
+
+    % Prepare data for plotting
+    pairwise_table.Properties.VariableNames = {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'pairwise_bray'};
+    anomaly_data = pairwise_table.pairwise_bray;
+    anomaly_initial_dates = pairwise_table.InitialDate;
+    anomaly_lagged_dates = pairwise_table.LaggedDate;
+    valid_idx = ~isnan(anomaly_data) & ~isinf(anomaly_data);
+    anomaly_data = anomaly_data(valid_idx);
+    anomaly_initial_dates = anomaly_initial_dates(valid_idx);
+    anomaly_lagged_dates = anomaly_lagged_dates(valid_idx);
+
+    % Identify top 5% anomalous points
+    threshold = prctile(anomaly_data, 90);
+    extreme_idx = anomaly_data >= threshold;
+    extreme_data = anomaly_data(extreme_idx);
+    extreme_initial_dates = anomaly_initial_dates(extreme_idx);
+    extreme_lagged_dates = anomaly_lagged_dates(extreme_idx);
+
+    % Identify sequences with more than 3 days in a moving 10-day window
+    date_nums = datenum(extreme_lagged_dates);
+    unique_dates = unique(date_nums);
+    sequence_idx = false(size(date_nums));
+    
+    for i = 1:length(unique_dates)
+        window_start = unique_dates(i);
+        window_end = window_start + 6; % 7-day window
+        window_idx = (date_nums >= window_start) & (date_nums <= window_end);
+        if sum(window_idx) >= 5
+            sequence_idx = sequence_idx | window_idx;
+        end
+    end
+
+    extreme_data_seq = extreme_data(sequence_idx);
+    extreme_initial_dates_seq = extreme_initial_dates(sequence_idx);
+    extreme_lagged_dates_seq = extreme_lagged_dates(sequence_idx);
+
+    % Plot time series
+    plot(anomaly_lagged_dates, anomaly_data, '-b', 'LineWidth', 1.5);
+    hold on;
+
+    % Overlay anomalous points
+    scatter(extreme_lagged_dates_seq, extreme_data_seq, 60, 'r', 'filled');
+
+    % Label anomalous points with initial dates
+    for i = 1:length(extreme_lagged_dates_seq)
+        text(extreme_lagged_dates_seq(i), extreme_data_seq(i), datestr(extreme_initial_dates_seq(i), 'dd mmm yyyy'), ...
+            'VerticalAlignment', 'bottom', 'HorizontalAlignment', 'right', 'FontSize', 12, 'Color', 'red', 'Rotation', 45);
+    end
+
+    % Customize plot
+    xlabel('Date');
+    ylabel('Bray Curtis Dissimilarity');
+    title(['Time Series of Bray Curtis Dissimilarity with ', num2str(days_to_diff), ' days lag']);
+    grid on;
+end
+
+% set(gcf, 'Position', [-100, 1000, 1600, 800]);
+set(gcf, 'Position', [0, 0, 1600, 800]);
+
+hold off;
+
+%% Plot the month of the year vs. the # of occurences of extreme 8-day Bray in that month
+
+% Clear the figure
+
+% Initialize the date range
+start_date = datetime(2017, 1, 1);
+end_date = datetime(2023, 12, 30);
+
+% Define optimal lags and set up initial configuration
+optimal_lags = [6];  % You can modify this array if needed
+
+% Placeholder for extreme dates
+extreme_dates = [];
+
+% Loop through each optimal lag
+for idx = 1:length(optimal_lags)
+    days_to_diff = optimal_lags(idx);
+
+    % Initialize the table to store pairwise results
+    pairwise_table = table([], [], [], [], [], 'VariableNames', {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'Dissimilarity'});
+    
+    % Loop through your dataset (assuming you have 'ifcb_mean' with date and index columns)
+    for i = 1:height(ifcb_mean)
+        exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+        j_indices = find(ifcb_mean.date == exact_days_later);
+
+        % Loop through matching indices
+        for j = j_indices'
+            % Calculate Bray Curtis dissimilarity
+            dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                            sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+            
+            % Store results in the table
+            pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(i), ifcb_mean.date(j), dissimilarity}];
+        end
+    end
+
+    % Rename variables for clarity
+    pairwise_table.Properties.VariableNames = {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'pairwise_bray'};
+
+    % Filter valid data
+    anomaly_data = pairwise_table.pairwise_bray;
+    anomaly_lagged_dates = pairwise_table.LaggedDate;
+    valid_idx = ~isnan(anomaly_data) & ~isinf(anomaly_data);
+    anomaly_data = anomaly_data(valid_idx);
+    anomaly_lagged_dates = anomaly_lagged_dates(valid_idx);
+
+    % Step 2: Calculate the top 5% threshold for the dissimilarity index
+    threshold = prctile(anomaly_data, 95);
+
+    % Step 3: Filter to get the dates where the index value is in the top 5%
+    extreme_idx = anomaly_data >= threshold;
+    extreme_dates_lagged = anomaly_lagged_dates(extreme_idx);
+
+    % Collect the extreme dates for this lag
+    extreme_dates = [extreme_dates; extreme_dates_lagged];
+end
+
+% Step 4: Group the extreme dates by year and month
+extreme_years = year(extreme_dates);  % Extract the year from the extreme dates
+extreme_months = month(extreme_dates);  % Extract the month from the extreme dates
+
+% Create a table to count extreme days by month and year
+years = unique(extreme_years);  % Get all unique years
+months = 1:12;  % Months from Jan to Dec
+
+% Create a matrix to hold the count of extreme days for each month and year
+extreme_day_counts = zeros(length(months), length(years));
+
+% Populate the matrix with counts of extreme days per month per year
+for i = 1:length(years)
+    for j = 1:length(months)
+        extreme_day_counts(j, i) = sum(extreme_years == years(i) & extreme_months == months(j));
+    end
+end
+
+% Step 5: Plot a stacked bar chart by year
+figure;
+bar(months, extreme_day_counts, 'stacked');
+ylim([0 20])
+xticks(1:12);
+xticklabels({'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'});
+xlabel('Month');
+ylabel('Number of Extreme Days (Top 5%)');
+title('Number of Days in Top 5% of Bray Curtis Dissimilarity by Month and Year');
+legend(arrayfun(@(x) num2str(x), years, 'UniformOutput', false), 'Location', 'northwest'); % Add a legend with years
+grid on;
+
+set(gcf, 'Position', [0,0, 1600, 800]);
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_anomlous_comparison\braycurtis_anomalous_month_stackedbar_8day.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_anomlous_comparison\braycurtis_anomalous_month_stackedbar_8day.pdf"]);
+end
+saving=0;
+
+%% Plot based on optimal lag
+
+% Clear the figure
+clf;
+
+% Initialize the date range
+start_date = datetime(2017, 1, 1);
+end_date = datetime(2023, 12, 30);
+
+% Define optimal lags from 1 to 10
+optimal_lags = 1:8;
+
+% Colors for the lines (each lag will have a different color)
+colors = [
+    0.10, 0.60, 0.74;  % Darker Cyan
+    0.85, 0.33, 0.31;  % Darker Red
+    0.47, 0.67, 0.19;  % Darker Green
+    0.93, 0.69, 0.13;  % Darker Yellow
+    0.55, 0.35, 0.64;  % Darker Purple
+    0.30, 0.75, 0.93;  % Darker Blue
+    0.64, 0.08, 0.18;  % Darker Brick Red
+    0.49, 0.40, 0.90;  % Darker Violet
+];
+% Placeholder for extreme dates
+figure;
+hold on;
+
+% Loop through each optimal lag and plot the shaded line for each
+for idx = 1:length(optimal_lags)
+    days_to_diff = optimal_lags(idx);
+
+    % Initialize the table to store pairwise results
+    pairwise_table = table([], [], [], [], [], 'VariableNames', {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'Dissimilarity'});
+
+    % Loop through your dataset (assuming you have 'ifcb_mean' with date and index columns)
+    for i = 1:height(ifcb_mean)
+        exact_days_later = ifcb_mean.date(i) + days(days_to_diff);
+        j_indices = find(ifcb_mean.date == exact_days_later);
+
+        % Loop through matching indices
+        for j = j_indices'
+            % Calculate Bray Curtis dissimilarity
+            dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                            sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+            
+            % Store results in the table
+            pairwise_table = [pairwise_table; {i, j, ifcb_mean.date(i), ifcb_mean.date(j), dissimilarity}];
+        end
+    end
+
+    % Rename variables for clarity
+    pairwise_table.Properties.VariableNames = {'Index1', 'Index2', 'InitialDate', 'LaggedDate', 'pairwise_bray'};
+
+    % Filter valid data
+    anomaly_data = pairwise_table.pairwise_bray;
+    anomaly_lagged_dates = pairwise_table.LaggedDate;
+    valid_idx = ~isnan(anomaly_data) & ~isinf(anomaly_data);
+    anomaly_data = anomaly_data(valid_idx);
+    anomaly_lagged_dates = anomaly_lagged_dates(valid_idx);
+
+    % Step 2: Calculate the top 5% threshold for the dissimilarity index
+    threshold = prctile(anomaly_data, 95);
+
+    % Step 3: Filter to get the dates where the index value is in the top 5%
+    extreme_idx = anomaly_data >= threshold;
+    extreme_dates_lagged = anomaly_lagged_dates(extreme_idx);
+
+    % Step 4: Count how many extreme days occurred in each month
+    extreme_months = month(extreme_dates_lagged);  % Extract the month from the extreme dates
+    extreme_day_counts = histcounts(extreme_months, 1:13);  % Count occurrences in each month (12 bins for months)
+
+    % Step 5: Plot a shaded line for each lag
+    months = 1:12;  % X-axis: months (Jan to Dec)
+    fill([months, fliplr(months)], [extreme_day_counts, zeros(size(extreme_day_counts))], ...
+        colors(idx, :), 'FaceAlpha', 0.8, 'EdgeColor', colors(idx, :), 'LineWidth', 1.5); % Shaded area under curve
+
+    % Overlay the line for each lag
+    plot(months, extreme_day_counts, 'Color', colors(idx, :), 'LineWidth', 2,'HandleVisibility', 'off');
+end
+
+% Customizing the plot
+xlim([1,12])
+xticks(1:12);
+xticklabels({'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'});
+ax = gca;  % Get current axes
+ax.FontSize = 16;
+xlabel('Month','FontSize',ftsz);
+ylabel('Number of Extreme Days','FontSize',ftsz);
+title('Number of Days in Top 5% of Bray Curtis Dissimilarity by Month for Different Lags','FontSize',ftsz);
+legend(arrayfun(@(x) ['Lag ', num2str(x)], optimal_lags, 'UniformOutput', false), 'Location', 'northwest');
+grid on;
+hold off;
+
+
+set(gcf, 'Position', [-100, 1000, 1600, 800]);
+
+saving=0;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_anomlous_comparison\braycurtis_anomalous_month_counts_all_lags.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\bray_curtis\bray_curtis_anomlous_comparison\braycurtis_anomalous_month_counts_all_lags.pdf"]);
+end
+saving=0;
+
+
+%% NMDS: Examine how all communities cluster in NMDS space
+
+%% Create a distance matrix for NMDS
+
+% Extract numerical columns (excluding "datetime" and "date" columns)
+numerical_columns = ifcb_mean.Properties.VariableNames;
+numerical_columns = numerical_columns(~ismember(numerical_columns, {'datetime', 'date'}));
+
+% Initialize a square distance matrix
+N = height(ifcb_mean);  % Number of rows
+distance_matrix = NaN(N, N);  % Initialize distance matrix with NaNs
+
+% Compute Bray-Curtis dissimilarity for all pairs of rows
+for i = 1:N
+    for j = i:N  % Loop through every pair, starting from row i (to avoid duplicate calculations)
+        % Calculate Bray-Curtis dissimilarity for the pair (i, j)
+        dissimilarity = pdist2(ifcb_mean{i, numerical_columns}, ifcb_mean{j, numerical_columns}, 'cityblock') / ...
+                        sum(abs(ifcb_mean{i, numerical_columns} + ifcb_mean{j, numerical_columns}));
+        
+        % Populate the matrix symmetrically
+        distance_matrix(i, j) = dissimilarity;
+        distance_matrix(j, i) = dissimilarity;  % Ensure symmetry
+    end
+end
+
+% Optionally, fill the diagonal with zeros (since dissimilarity between the same rows is 0)
+for i = 1:N
+    distance_matrix(i, i) = 0;
+end
+
+
+
+%%
+max_dimensions = 10;  % Set the maximum number of dimensions to evaluate
+stress_values = zeros(1, max_dimensions);  % Array to store stress values
+
+for dims = 1:max_dimensions
+    % Run NMDS with increasing dimensions
+    [Y, stress] = mdscale(distance_matrix, dims, 'Criterion', 'stress');
+    stress_values(dims) = stress;
+end
+
+% Plot stress values vs number of dimensions
+figure;
+plot(1:max_dimensions, stress_values, '-o');
+xlabel('Number of Dimensions');
+ylabel('Stress');
+title('NMDS Stress vs. Number of Dimensions');
+grid on;
+
+%3 looks the best, proceed
+%% Run NMDS (Non-metric Multidimensional Scaling)
+num_dimensions = 3;  % You may run it with 3 dimensions, but we'll only use 2 for plotting
+[Y, stress] = mdscale(distance_matrix, num_dimensions, 'Criterion', 'stress');
+
+% Display the NMDS stress value (lower is better)
+disp(['NMDS Stress: ', num2str(stress)]);
+
+%% Determine optimal number of clusters using the elbow method
+max_clusters = 10;  % Maximum number of clusters to consider
+sse = zeros(1, max_clusters);  % Initialize SSE array
+
+for k = 1:max_clusters
+    % Perform k-means clustering
+    [~, ~, sumd] = kmeans(Y, k, 'Replicates', 10, 'MaxIter', 1000, 'Display', 'final');
+    sse(k) = sum(sumd);  % Sum of squared distances to centroids
+end
+
+% Plot SSE to find the elbow point
+figure;
+plot(1:max_clusters, sse, '-o');
+xlabel('Number of Clusters');
+ylabel('Sum of Squared Errors (SSE)');
+title('Elbow Method for Optimal Clusters');
+grid on;
+
+% Assume the elbow occurs at 3 clusters (you can adjust this based on the plot)
+optimal_clusters = 3;
+
+% Run k-means clustering with the optimal number of clusters
+[idx, C] = kmeans(Y, optimal_clusters, 'Replicates', 10, 'MaxIter', 1000, 'Display', 'final');
+
+%% Visualize NMDS results with clusters and ellipses, plotting only NMDS 1 and 2
+clf;
+figure;
+hold on;
+
+% Define distinct shapes for each year
+unique_years = 2016:2023;
+shapes = {'o', 's', 'd', '^', 'v', 'p', 'h','>'};  % Add more shapes if needed
+shape_map = containers.Map(unique_years, shapes(1:length(unique_years)));
+
+% Add ellipses for each cluster
+colors = lines(optimal_clusters);  % Define distinct colors for each cluster
+
+% Define the date range for bold red labels
+start_date = datetime(2020, 8, 16);
+end_date = datetime(2020, 9, 22);
+
+for k = 1:optimal_clusters
+    cluster_points = Y(idx == k, 1:2);  % Use only NMDS 1 and NMDS 2 (first two columns)
+    cluster_indices = find(idx == k);  % Indices of points in this cluster
+    
+    % Plot the cluster points with year-based shapes
+    for i = 1:length(unique_years)
+        year_idx = cluster_indices(ifcb_mean.year(cluster_indices) == unique_years(i));
+        
+        % Plot the NMDS points for this cluster and year (only NMDS 1 and 2)
+        scatter(cluster_points(ifcb_mean.year(cluster_indices) == unique_years(i), 1), ...
+                cluster_points(ifcb_mean.year(cluster_indices) == unique_years(i), 2), ...
+                200, 'Marker', shape_map(unique_years(i)), 'MarkerEdgeColor', colors(k, :), ...
+                'MarkerFaceColor', colors(k, :), 'DisplayName', ['Cluster ', num2str(k), ' (Year ', num2str(unique_years(i)), ')']);
+    end
+    
+    % Calculate the covariance matrix and mean for the ellipse
+    mu = mean(cluster_points);  % Mean of the cluster points (only NMDS 1 and 2)
+    sigma = cov(cluster_points);  % Covariance matrix for NMDS 1 and 2
+    
+    % Plot the confidence ellipse for NMDS 1 and 2
+    plot_gaussian_ellipse(mu, sigma, colors(k, :));  % Custom function to plot ellipse
+    
+    % Label points with the date only for clusters with fewer than 50 points
+    if length(cluster_indices) < 500
+        for j = 1:length(cluster_indices)
+            point_date = ifcb_mean.date(cluster_indices(j));
+            point_x = cluster_points(j, 1);
+            point_y = cluster_points(j, 2);
+            
+            % Check if the point falls within the specific date range
+            if point_date >= start_date && point_date <= end_date
+                % Make the text bold and red for points within the date range
+                text(point_x, point_y, datestr(point_date, 'mm/dd/yyyy'), ...
+                    'FontSize', 12, 'FontWeight', 'bold', 'Color', 'r', ...
+                    'Rotation', 30, 'VerticalAlignment', 'bottom','FontName','Arial');
+            else
+                % Default text for other points within the cluster with fewer than 50 points
+                text(point_x, point_y, datestr(point_date, 'mm/dd/yyyy'), ...
+                    'FontSize', 12, 'Rotation', 30, 'VerticalAlignment', 'bottom','FontName','Arial');
+            end
+        end
+    end
+end
+
+% Customize the plot
+xlabel('NMDS Dimension 1');
+ylabel('NMDS Dimension 2');
+title('NMDS of 6-Day Bray-Curtis Dissimilarity');
+grid on;
+ax = gca;  % Get current axes
+ax.FontSize = 16;
+ax.FontName = 'Arial';
+
+set(gcf,'Position',[0 0 1600 800])
+
+saving=1;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.pdf"]);
+end
+saving=0;
+
+
+%% Function to plot a Gaussian confidence ellipse for NMDS 1 and 2
+function plot_gaussian_ellipse(mu, sigma, color)
+    % Create a Gaussian confidence ellipse for 2D (NMDS 1 and 2)
+    theta = linspace(0, 2*pi, 100);
+    unit_circle = [cos(theta); sin(theta)];  % Parametric unit circle
+    ellipse = sqrtm(sigma) * unit_circle;  % Apply the covariance matrix
+    ellipse = bsxfun(@plus, ellipse, mu');  % Shift by the mean
+    
+    % Plot the ellipse
+    plot(ellipse(1, :), ellipse(2, :), 'Color', color, 'LineWidth', 2);
+end
+
+
+
+%% No let's look at the other events in the outliers, looks like April/May 2020
+%Plot absolute abundance
+
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green 
+];
+
+defaultColor = [0.7, 0.7, 0.7];  % Gray color for 'Other Taxa'
+
+%Select taxa
+ifcb_taxa_plot=ifcb_taxa_sel(:,1:end-1);
+% Find indices of significant taxa
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, significant_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant )), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+
+% Create a colormap with distinct and contrasting colors for each unique group
+num_groups = length(significant_indices) + 1;  % Including 'Other Taxa'
+new_color_map = distinguishable_bright_colors(num_groups);  % Generate a colormap with distinct colors
+
+% Clear and set up the figure
+clf;
+figure;
+
+
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+lag_days = 6;
+start_date = datetime(2020, 3,1);
+end_date = datetime(2020, 8, 1);
+lag_date = datetime(2020, 8, 20 + lag_days);
+august_date = datetime(2020, 9, 9);
+peak_fire=datetime(2020,8,20);
+
+linewdt=3;
+
+
+xlim([start_date end_date]);  % Adjust as necessary
+
+% Apply custom color map with default color for 'Other Taxa'
+new_color_map = [colorz(1:length(significant_indices), :); defaultColor];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every five days
+set(gca, 'XTick', start_date:caldays(5):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells/L','FontSize',28);
+% title('IFCB Community Composition');
+
+% Add a legend excluding datetime
+legend(new_variable_names(1:end-1), 'Location', 'bestoutside', 'AutoUpdate', 'off');
+
+
+
+
+
+
+% ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+ylim([0 7.5e5])
+
+ax = gca;  % Get current axes
+ax.FontSize = 20;
+%ax.FontName = 'Times';
+
+
+
+% Adjust figure size
+set(gcf, 'Position', [0, 100, 1300, 700]);
+hold off;
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_2018_comparison_bloom.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\ifcb\ifcb_2018_comparison_bloom.pdf");
+end
+
+
+%% Normalized
+start_date = datetime(2018, 5, 1);
+end_date = datetime(2018, 8, 1);
+
+
+% Step 1: Normalize taxa abundances so each row sums to 1
+normalized_taxa_abundances_table = varfun(@(x) x ./ sum(table2array(new_taxa_abundances(:, 1:end-1)), 2), new_taxa_abundances(:, 1:end-1));
+normalized_taxa_abundances_table.datetime = new_taxa_abundances.datetime;  % Add datetime
+
+
+% Convert to timetable
+taxa_abundances_timetable = table2timetable(normalized_taxa_abundances_table, 'RowTimes', 'datetime');
+
+% Step 3: Resample the timetable for daily data using 'fillwithmissing'
+taxa_abundances_daily = retime(taxa_abundances_timetable, 'daily', 'fillwithmissing');
+
+% Step 4: Plot the normalized data
+clf;
+figure;
+
+% Create a stacked bar plot for normalized data
+hBar = bar(taxa_abundances_daily.datetime, table2array(taxa_abundances_daily(:, 1:end)), 'stacked', 'BarWidth', 1);
+
+% Customize plot colors
+new_color_map = [colorz(1:length(significant_indices), :); defaultColor];  % Add default color for 'Other Taxa'
+
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances_daily, 1), 1);
+end
+
+% Set x-axis limits
+xlim([start_date end_date]);
+
+% Set x-axis ticks and format
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate x-axis labels for readability
+
+% Set y-axis label and title
+ylabel('Relative Abundance', 'FontSize', 28);
+
+% Set legend excluding datetime
+legend(new_variable_names(1:end-1), 'Location', 'bestoutside', 'AutoUpdate', 'off');
+
+% Set y-axis limits
+xlim([start_date end_date]);  % Adjust as necessary
+ylim([0 1]);  % Since the data is normalized, max value is 1
+
+% Adjust font size for the axes
+ax.FontSize = 20;
+
+% Adjust figure size
+set(gcf, 'Position', [0, 100, 1300, 700]);
+
+hold off;
+
+
+%% Comparing all Falls
+
+% Define color map
+colorz = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green 
+];
+defaultColor = [0.7, 0.7, 0.7];  % Gray color for 'Other Taxa'
+
+% Define the range of years
+years = 2017:2023;
+
+% Normalize taxa abundances
+normalized_taxa_abundances_table = varfun(@(x) x ./ sum(table2array(new_taxa_abundances(:, 1:end-1)), 2), new_taxa_abundances(:, 1:end-1));
+normalized_taxa_abundances_table.datetime = new_taxa_abundances.datetime;  % Add datetime
+
+% Convert to timetable
+taxa_abundances_timetable = table2timetable(normalized_taxa_abundances_table, 'RowTimes', 'datetime');
+
+% Resample the timetable for daily data using 'fillwithmissing'
+taxa_abundances_daily = retime(taxa_abundances_timetable, 'daily', 'fillwithmissing');
+
+% Set up tiled layout (7 rows: 6 subplots for years + 1 for the common plot)
+clf;
+t = tiledlayout(2, 4, 'TileSpacing', 'Compact', 'Padding', 'Compact');
+
+% Loop through each year, creating a subplot for each
+for i = 1:length(years)
+    % Define start and end dates for the year
+    start_date = datetime(years(i), 1, 24);  % January 24 of the current year
+    end_date = datetime(years(i), 12, 1);    % December 1 of the current year
+
+    % Create subplot for the current year
+    nexttile;  % Automatically assigns the next available tile
+
+    % Plot the normalized data for the current year
+    hBar = bar(taxa_abundances_daily.datetime, table2array(taxa_abundances_daily(:, 1:end)), 'stacked', 'BarWidth', 1);
+
+    % Customize plot colors
+    new_color_map = [colorz(1:length(significant_indices), :); defaultColor];  % Add default color for 'Other Taxa'
+
+    % Apply colors to the bars
+    for k = 1:length(hBar)
+        hBar(k).FaceColor = 'flat';
+        hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances_daily, 1), 1);
+    end
+
+    % Set x-axis limits for the current year
+    xlim([start_date end_date]);
+
+    % Set x-axis ticks and format
+    set(gca, 'XTick', start_date:caldays(30):end_date);  % Set ticks every 30 days
+    ax = gca;
+    ax.XTickLabelRotation = 45;  % Rotate x-axis labels for readability
+
+    % Set y-axis label
+    ylabel('Rel. Abundance', 'FontSize', 12);
+
+    % Add title for each subplot
+    title(['Year: ', num2str(years(i))], 'FontSize', 14);
+
+    % Set y-axis limits
+    ylim([0 1]);  % Since the data is normalized, max value is 1
+
+    % Adjust font size for the axes
+    ax.FontSize = 10;
+end
+
+% Step 5: Add a common subplot
+nexttile;  % Create the final tile for the common plot
+
+% Plot the cumulative/average normalized data across all years (for demonstration)
+avg_taxa_abundances = mean(table2array(taxa_abundances_daily(:, 1:end)), 1, 'omitnan');
+hBar_common = bar(categorical(new_variable_names(1:end-1)), avg_taxa_abundances, 'stacked', 'BarWidth', 0.5);
+
+% Customize common subplot colors
+for k = 1:length(hBar_common)
+    hBar_common(k).FaceColor = new_color_map(k, :);
+end
+
+% Set title and labels for the common subplot
+title('Average Relative Abundances (2017-2023)', 'FontSize', 14);
+ylabel('Avg. Rel. Abundance', 'FontSize', 12);
+ylim([0 1]);
+
+% Add common legend outside the plot area
+legend(new_variable_names(1:end-1), 'Location', 'eastoutside', 'AutoUpdate', 'off');
+
+% Adjust figure size to fit the layout
+set(gcf, 'Position', [100, 100, 1400, 900]);

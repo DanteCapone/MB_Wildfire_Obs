@@ -8,6 +8,7 @@ savepath
 %% Part 2: Analysis
 load('merra_MB_bc_avg_daily_plt.mat')
 load('satellite_chl_MB_5day_anomalies.mat')
+
 %% Climatologies
 
 base_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl';
@@ -17,18 +18,26 @@ start_year=2008;
 end_year=2023;
 years=start_year:1:end_year;
 base_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl';
-data_type = 'day';  % Change as needed: 'daily', '5day', '15day', 'month'
+data_type = '5day';  % Change as needed: 'daily', '5day', '15day', 'month'
 
 %Implement function to calculate climatology (Takes a while)
 results = computeChlorophyllMetrics(base_path, data_type, 2008, 2023);
 results.years=years;
 
-%% 
+%% Compute climatologies for only upwelling shadow region
+
+%Implement function to calculate climatology (Takes a while)
+load('EOF3_upwelling_shadow_mask.mat','mask')
+results_shadow = computeChlorophyllMetricsshadow(base_path, data_type, 2008, 2023, mask);
+results_shadow.years=years;
+
+satellite_chl_MB_5day_climatology_08_23_shadow=results_shadow;
+save('Q:\Dante\data\MB_Wildfire_Obs\processed_data\satellite\satellite_chl_MB_5day_climatology_08_23_shadow.mat','satellite_chl_MB_5day_climatology_08_23_shadow')
 
 %% Plot climatologies
 % Now plot the output in a figure with two subplots
 load('merra_MB_bc_avg_daily_plt.mat')
-
+load('satellite_chl_MB_daily_climatology_08_23.mat')
 
 % For axis labels
 month_labs = {'Jan', 'Feb', 'Ma', 'Apr', 'May', 'Jun', ...
@@ -48,7 +57,7 @@ plot(xvals, results.climatology, 'g-','LineWidth',2);
 title('Monterey Bay Chlorophyll-a Climatology (5-day)');
 xlabel('Month');
 ylabel('Chlorophyll-a [mg/m^3] Climatology');
-% xlim([0 73])
+xlim([0 73])
 % set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
 grid on;
 
@@ -73,7 +82,7 @@ for i = 1:size(results.anomalies, 2)  % Loop through each year
     end
 end
 ylim([-2 10])
-xlim([0 366])
+% xlim([0 366])
 
 
 % Update legend to only include selected years
@@ -118,16 +127,182 @@ set(gca, 'XTick', 1:30:366, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);
 % set(gcf,'Position',[-400 1200 1600 600])
 set(gcf,'Position',[0 0 1600 600])
 
-saving=1;
+saving=0;
 if saving==1
-    if data_type=='day'
+    if data_type=='5day'
     saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.png"]);
     saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.pdf"]);
     end
 end
 saving=0;
 
+%% Plot for only upwelling shadow masked region
 
+
+% For axis labels
+month_labs = {'Jan', 'Feb', 'Ma', 'Apr', 'May', 'Jun', ...
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'};
+
+
+% Calculate the months for x-axis labels
+% Each 5-day period's month is calculated assuming the period starts on Jan 1
+% month_5weeks = arrayfun(@(x) datestr(datetime(start_year,1,1) + days(x*5-2.5), 'mmm'), 1:73, 'UniformOutput', false);
+clf
+figure(1);
+% First subplot for climatology with shaded confidence intervals
+xvals = 1:length(results_shadow.climatology);
+fill([xvals, fliplr(xvals)], [results_shadow.climatology' + results_shadow.error', fliplr(results_shadow.climatology' - results_shadow.error')], [0.9 0.9 1], 'EdgeColor', 'none'); hold on;
+plot(xvals, results_shadow.climatology, 'g-','LineWidth',2);
+title('Monterey Bay Chlorophyll-a Climatology (5-day)');
+xlabel('Month');
+ylabel('Chlorophyll-a [mg/m^3] Climatology');
+xlim([0 73])
+set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+grid on;
+
+% Second subplot for anomalies with a zero line
+% yyaxis right
+years_sel=[2020];
+legendInfo = cell(end_year - start_year + 1, 1);  % Initialize cell array for legend labels
+index = 1;  % Initialize index for storing labels in legendInfo
+counter=0;
+
+for i = 1:size(results_shadow.anomalies, 2)  % Loop through each year
+    currentYear = start_year + i - 1;  % Calculate the current year
+    if ismember(currentYear, years_sel)
+        counter=counter+1;
+        yearLabel = sprintf('%d', currentYear);  % Create a label for the current year
+        plot(1:size(results_shadow.anomalies, 1), results_shadow.dailyData(:, i), '-', 'Color', colors(counter, :), 'DisplayName', yearLabel, 'LineWidth', 2);
+        % shade_anomaly(1:size(results_shadow.anomalies, 1), results_shadow.anomalies(:, i))
+        hold on
+        ylabel('Chlorophyll-a Anomaly 2020 [mg/m^3]');
+        legendInfo{index} = yearLabel;  % Store the year label in the appropriate position
+        index = index + 1;  % Increment the index for the next valid year
+    end
+end
+% ylim([-2 10])
+% xlim([0 366])
+set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+
+
+
+% Update legend to only include selected years
+% legend(legendInfo(1:index-1), 'Location', 'northwest');  % Adjust legend to show only included years
+title('Monterey Bay Chlorophyll-a Anomaly');
+% xlabel('Month');
+ylabel('Chlorophyll-a [mg/m^3]');
+
+
+grid on;
+% legend(legendInfo, 'Location', 'northeastoutside');  % Display the legend outside the plot
+
+
+
+set(gcf,'Position',[-0 300 1600 600])
+% set(gcf,'Position',[0 0 1600 600])
+
+
+%% Plot climatologies
+% Now plot the output in a figure with two subplots
+load('merra_MB_bc_avg_daily_plt.mat')
+load('satellite_chl_MB_daily_climatology_08_23.mat')
+
+% For axis labels
+month_labs = {'Jan', 'Feb', 'Ma', 'Apr', 'May', 'Jun', ...
+              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'};
+
+
+% Calculate the months for x-axis labels
+% Each 5-day period's month is calculated assuming the period starts on Jan 1
+% month_5weeks = arrayfun(@(x) datestr(datetime(start_year,1,1) + days(x*5-2.5), 'mmm'), 1:73, 'UniformOutput', false);
+clf
+figure(1);
+% First subplot for climatology with shaded confidence intervals
+subplot(2,1,1);
+xvals = 1:length(results.climatology);
+fill([xvals, fliplr(xvals)], [results.climatology' + results.error', fliplr(results.climatology' - results.error')], [0.9 0.9 1], 'EdgeColor', 'none'); hold on;
+plot(xvals, results.climatology, 'g-','LineWidth',2);
+title('Monterey Bay Chlorophyll-a Climatology (5-day)');
+xlabel('Month');
+ylabel('Chlorophyll-a [mg/m^3] Climatology');
+xlim([0 73])
+% set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+grid on;
+
+% Second subplot for anomalies with a zero line
+yyaxis right
+years_sel=[2020];
+legendInfo = cell(end_year - start_year + 1, 1);  % Initialize cell array for legend labels
+index = 1;  % Initialize index for storing labels in legendInfo
+counter=0;
+
+for i = 1:size(results.anomalies, 2)  % Loop through each year
+    currentYear = start_year + i - 1;  % Calculate the current year
+    if ismember(currentYear, years_sel)
+        counter=counter+1;
+        yearLabel = sprintf('%d', currentYear);  % Create a label for the current year
+        % plot(1:size(results.anomalies, 1), results.anomalies(:, i), '-', 'Color', colors(counter, :), 'DisplayName', yearLabel, 'LineWidth', 2);
+        shade_anomaly(1:size(results.anomalies, 1), results.anomalies(:, i))
+        hold on
+        ylabel('Chlorophyll-a Anomaly 2020 [mg/m^3]');
+        legendInfo{index} = yearLabel;  % Store the year label in the appropriate position
+        index = index + 1;  % Increment the index for the next valid year
+    end
+end
+ylim([-2 10])
+% xlim([0 366])
+
+
+% Update legend to only include selected years
+plot(xlim, [0 0], 'k-','LineWidth',2,'Color', [0,0,0, 0.5],'LineStyle','-');  % Adding a zero line
+% legend(legendInfo(1:index-1), 'Location', 'northwest');  % Adjust legend to show only included years
+title('Monterey Bay Chlorophyll-a Anomaly');
+% xlabel('Month');
+ylabel('Chlorophyll-a [mg/m^3]');
+% xlim([0 73])
+% set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+set(gca, 'XTick', 1:30:366, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+
+grid on;
+% legend(legendInfo, 'Location', 'northeastoutside');  % Display the legend outside the plot
+
+
+
+subplot(2,1,2); hold on;
+
+%Change BC to g/m3 for plotting
+merra_bc_plt.Median_BCCMASS=merra_bc_plt.Median_BCCMASS.*1000;
+merra_bc_plt.anomaly=merra_bc_plt.anomaly.*1000;
+
+yyaxis left;
+plotClimatology(merra_bc_plt((merra_bc_plt.datetime.Year > 2002) & ...
+                            (merra_bc_plt.datetime.Year ~= 2008) & ...
+                            (merra_bc_plt.datetime.Year ~= 2016) & ...
+                            (merra_bc_plt.datetime.Year ~= 2020) & ...
+                            (merra_bc_plt.datetime.Year ~= 2021),:),'Median_BCCMASS')
+ylabel(['BC Surface',newline(),'Mass Concentration [g/m^3] Climatology'])
+ylim([0 1.5e-3])
+alpha(0.1)
+hold on 
+yyaxis right;
+% plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.anomaly(merra_bc_plt.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+shade_anomaly(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.anomaly(merra_bc_plt.datetime.Year == 2020))
+xlim([0 366])
+ylabel(['BC Surface',newline(),'Mass Concentration 2020 Anomaly [g/m^3]'])
+set(gca, 'XTick', 1:30:366, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+
+
+% set(gcf,'Position',[-400 1200 1600 600])
+set(gcf,'Position',[0 0 1600 600])
+
+saving=0;
+if saving==1
+    if data_type=='5day'
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.pdf"]);
+    end
+end
+saving=0;
 
 %% Plot
 
@@ -262,6 +437,7 @@ data_type = 'month';  % Change as needed: 'daily', '5day', '15day', 'month'
 
 results_grid = computeChlorophyllMetricsByGrid(base_path, data_type, 2020, 2020);
 
+
 %% Coordinate calculations
 maxX = 307; % Maximum x index for chlorophyll data
 maxY = 318; % Maximum y index for chlorophyll data
@@ -290,7 +466,7 @@ xlabel('Longitude');
 ylabel('Latitude');
 title('Monterey Bay 2020 Chlorophll-a Climatology');
 
-set(gcf,'Position',[0 900 800 600])
+set(gcf,'Position',[0 100 800 600])
 
 saving=0;
 if saving==1
@@ -513,49 +689,89 @@ function output = computeChlorophyllMetrics(base_path, data_type, start_year, en
 end
 
 
-% function output = computeChlorophyllMetrics(base_path, start_year, end_year)
-%     dailyData = nan(366, end_year - start_year + 1);  % Assuming leap years are included
-% 
-%     for year = start_year:end_year
-%         file_path = fullfile(base_path, sprintf('%d', year), sprintf('C%d_chl_day', year));
-%         files = dir(fullfile(file_path, '*.hdf'));
-% 
-%         for f = 1:length(files)
-%             filename = files(f).name;
-%             tokens = regexp(filename, '(?i)C(\d{4})(\d{3})_chl_comp_mapped\.hdf', 'tokens');
-%             if ~isempty(tokens)
-%                 tokens = tokens{1}; % First and only match set
-%                 dayOfYear = str2double(tokens{2});
-%             else
-%                 error('Filename does not match expected format');
-%             end
-% 
-%             fullFilePath = fullfile(file_path, filename);
-%             info = hdfinfo(fullFilePath);
-%             dataSetName = info.SDS(1).Name;
-%             data = hdfread(fullFilePath, dataSetName);
-%             data = int16(data);
-%             data(data < 0) = data(data < 0) + 256;
-%             data(data < 2 | data > 254) = NaN;
-%             validData = data > 1 & data < 255;
-%             chlConcentration = NaN(size(data));
-%             chlConcentration(validData) = 10.^(0.015 * double(data(validData)) - 2.0);
-%             dailyData(dayOfYear, year - start_year + 1) = nanmean(chlConcentration(:));
-%         end
-%     end
-% 
-%     % Reshape dailyData into a single vector
-%     dailyData = reshape(dailyData, [], 1);  % Reshape to 366*(end_year - start_year + 1) automatically
-% 
-%     climatology = nanmean(reshape(dailyData, 366, []), 2);
-%     sem = nanstd(reshape(dailyData, 366, []), 0, 2) / sqrt(sum(~isnan(reshape(dailyData, 366, [])), 2));
-%     ci95 = 1.96 * sem;
-%     anomalies = reshape(dailyData, 366, []) - climatology;
-% 
-%     output.climatology = climatology;
-%     output.error = ci95;
-%     output.anomalies = anomalies;
-% end
+%% Climatology computation usingupwelling shadow Mask
+function output = computeChlorophyllMetricsshadow(base_path, data_type, start_year, end_year, mask)
+    
+    % Define the aggregation period based on data type
+    switch data_type
+        case 'day'
+            datePattern = '(?i)C(\d{4})(\d{3})_chl_comp_mapped\.hdf';
+            numPeriods = 366;  % Consider leap years
+        case '5day'
+            datePattern = 'C(\d{4})(\d{3})(\d{4})(\d{3})__comp\.hdf';
+            numPeriods = 73;   % 5-day periods in a year
+            periodLength = 5;
+        case '15day'
+            datePattern = 'C(\d{4})(\d{3})(\d{4})(\d{3})__comp\.hdf';
+            numPeriods = 24;   % 15-day periods in a year
+            periodLength = 15;
+        case 'month'
+            datePattern = 'C(\d{4})(\d{3})(\d{4})(\d{3})__comp\.hdf';
+            numPeriods = 12;   % Months in a year
+        otherwise
+            error('Invalid data type specified.');
+    end
+
+    % Initialize storage for all data across all years
+    dailyData = nan(numPeriods, end_year - start_year + 1); 
+
+    for year = start_year:end_year
+        yearIndex = year - start_year + 1;
+        folder_path = fullfile(base_path, sprintf('%d', year), sprintf('C%d_chl_%s', year, data_type));
+        files = dir(fullfile(folder_path, '*.hdf'));
+
+        for f = 1:length(files)
+            filename = files(f).name;
+            tokens = regexp(filename, datePattern, 'tokens');
+            if ~isempty(tokens)
+                startDay = str2double(tokens{1}(2));
+                if strcmp(data_type, 'day')
+                    period = str2double(tokens{1}(2));
+                elseif strcmp(data_type, 'month')
+                    endDay = str2double(tokens{1}(4));
+                    representativeDay = round(mean([startDay, endDay]));
+                    period = dayOfYearToMonth(representativeDay, year);
+                else
+                    if exist('periodLength', 'var')
+                        period = ceil(startDay / periodLength);
+                    else
+                        error('Period length is not set for data type %s', data_type);
+                    end
+                end
+            else
+                error('Filename does not match expected format');
+            end
+
+            fullFilePath = fullfile(folder_path, filename);
+            info = hdfinfo(fullFilePath);
+            dataSetName = info.SDS(1).Name;
+            data = hdfread(fullFilePath, dataSetName);
+            data = int16(data);
+            data(data < 0) = data(data < 0) + 256;
+            data(data < 2 | data > 254) = NaN;
+            validData = data > 1 & data < 255;
+            chlConcentration = NaN(size(data));
+            chlConcentration(validData) = 10.^(0.015 * double(data(validData)) - 2.0);
+
+            % Apply the mask
+            maskedData = chlConcentration .* mask;
+            dailyData(period, year - start_year + 1) = nanmean(maskedData(:));  % Only average data within the mask
+        end
+    end
+
+    % Calculate climatology and confidence intervals
+    climatology = nanmedian(dailyData, 2);
+    sem = nanstd(dailyData, 0, 2) / sqrt(sum(~isnan(dailyData), 2));
+    ci95 = 1.96 * sem;
+    anomalies = dailyData - climatology;
+
+    % Prepare the output structure
+    output.climatology = climatology;
+    output.error = ci95;
+    output.anomalies = anomalies;
+    output.dailyData = dailyData;
+end
+
 
 %% Helper Functions
 function addSubfoldersToPath(rootPath)

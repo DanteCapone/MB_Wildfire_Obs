@@ -8,6 +8,7 @@ savepath
 %% Part 2: Analysis
 load('merra_MB_bc_avg_daily_plt.mat')
 load('satellite_chl_MB_5day_anomalies.mat')
+
 %% Climatologies
 
 base_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl';
@@ -23,11 +24,8 @@ data_type = '5day';  % Change as needed: 'daily', '5day', '15day', 'month'
 results = computeChlorophyllMetrics(base_path, data_type, 2008, 2023);
 results.years=years;
 
+%% 
 
-
-%%
-
-imagesc(squeeze(results_grid.anomalies(:,:,1,1)))
 %% Plot climatologies
 % Now plot the output in a figure with two subplots
 load('merra_MB_bc_avg_daily_plt.mat')
@@ -51,8 +49,8 @@ plot(xvals, results.climatology, 'g-','LineWidth',2);
 title('Monterey Bay Chlorophyll-a Climatology (5-day)');
 xlabel('Month');
 ylabel('Chlorophyll-a [mg/m^3] Climatology');
-xlim([0 73])
-set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+% xlim([0 73])
+% set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
 grid on;
 
 % Second subplot for anomalies with a zero line
@@ -70,22 +68,25 @@ for i = 1:size(results.anomalies, 2)  % Loop through each year
         % plot(1:size(results.anomalies, 1), results.anomalies(:, i), '-', 'Color', colors(counter, :), 'DisplayName', yearLabel, 'LineWidth', 2);
         shade_anomaly(1:size(results.anomalies, 1), results.anomalies(:, i))
         hold on
-        ylabel('Chlorophyll-a [mg/m^3]');
+        ylabel('Chlorophyll-a Anomaly 2020 [mg/m^3]');
         legendInfo{index} = yearLabel;  % Store the year label in the appropriate position
         index = index + 1;  % Increment the index for the next valid year
     end
 end
-ylim([-2 5])
+ylim([-2 10])
+xlim([0 366])
 
 
 % Update legend to only include selected years
 plot(xlim, [0 0], 'k-','LineWidth',2,'Color', [0,0,0, 0.5],'LineStyle','-');  % Adding a zero line
-legend(legendInfo(1:index-1), 'Location', 'northwest');  % Adjust legend to show only included years
+% legend(legendInfo(1:index-1), 'Location', 'northwest');  % Adjust legend to show only included years
 title('Monterey Bay Chlorophyll-a Anomaly');
 % xlabel('Month');
 ylabel('Chlorophyll-a [mg/m^3]');
-xlim([0 73])
-set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+% xlim([0 73])
+% set(gca, 'XTick', 1:73/12:73, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+set(gca, 'XTick', 1:30:366, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
+
 grid on;
 % legend(legendInfo, 'Location', 'northeastoutside');  % Display the legend outside the plot
 
@@ -95,6 +96,8 @@ subplot(2,1,2); hold on;
 
 %Change BC to g/m3 for plotting
 merra_bc_plt.Median_BCCMASS=merra_bc_plt.Median_BCCMASS.*1000;
+merra_bc_plt.anomaly=merra_bc_plt.anomaly.*1000;
+
 yyaxis left;
 plotClimatology(merra_bc_plt((merra_bc_plt.datetime.Year > 2002) & ...
                             (merra_bc_plt.datetime.Year ~= 2008) & ...
@@ -106,19 +109,22 @@ ylim([0 1.5e-3])
 alpha(0.1)
 hold on 
 yyaxis right;
-plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.anomaly(merra_bc_plt.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
+% plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.anomaly(merra_bc_plt.datetime.Year == 2020),'Color',colorz(3,:),'LineStyle','-','LineWidth',2);
 shade_anomaly(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020),merra_bc_plt.anomaly(merra_bc_plt.datetime.Year == 2020))
 xlim([0 366])
-ylabel(['BC Surface',newline(),'Mass Concentration [g/m^3]'])
+ylabel(['BC Surface',newline(),'Mass Concentration 2020 Anomaly [g/m^3]'])
+set(gca, 'XTick', 1:30:366, 'XTickLabel', month_labs, 'XTickLabelRotation', 45);  % Use the same x-axis labels
 
 
 % set(gcf,'Position',[-400 1200 1600 600])
-set(gcf,'Position',[-100 1000 1600 600])
+set(gcf,'Position',[0 0 1600 600])
 
-saving=1;
+saving=0;
 if saving==1
-    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra.png"]);
-    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra.pdf"]);
+    if data_type=='day'
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\satellite_chl_climatology_5day_MB_fire_years_with_merra_daily.pdf"]);
+    end
 end
 saving=0;
 
@@ -185,21 +191,37 @@ validRows = ~isnan(satellite_all_raw.Chlorophyll);  % Logical index for rows wit
 satellite_all = satellite_all_raw(validRows, :);
 
 
-%%
-start_year=2003;
+%% Xcorr
+start_year=2020;
 end_year=2020;
-satellite_all_2020=satellite_all(satellite_all.datetime_merra_bc_plt.Year>=start_year & satellite_all.datetime_merra_bc_plt.Year <= end_year,:);
-x=satellite_all_2020.anomaly;
-y=satellite_all_2020.Chlorophyll;
+satellite_all_sel=satellite_all(satellite_all.datetime_merra_bc_plt.Year>=start_year & satellite_all.datetime_merra_bc_plt.Year <= end_year,:);
+x=detrend(satellite_all_sel.anomaly-mean(satellite_all_sel.anomaly));
+y=detrend(satellite_all_sel.Chlorophyll-mean(satellite_all_sel.Chlorophyll));
 
 % Initialize variables to store coefficients and lags
 
-start_date_plot=satellite_all_2020.datetime_merra_bc_plt(1);
-end_date_plot=satellite_all_2020.datetime_merra_bc_plt(end);
+start_date_plot=satellite_all_sel.datetime_merra_bc_plt(1);
+end_date_plot=satellite_all_sel.datetime_merra_bc_plt(end);
+start_date_plot=datetime(2020,1,1);
+end_date_plot=datetime(2020,12,31);
+
 
 %Cross-correlate
 [cc,lags] = xcorr(x,y,'coeff');
-% Plot the cross-correlation
+
+
+ % Compute first derivative of cc values
+cc_derivative = diff(cc(:));
+lags_midpoints = (lags(1:end-1) + lags(2:end)) / 2; % Compute midpoints of lags for derivative
+
+% Find indices where derivative changes from positive to negative (relative maxima)
+maxima_indices = find(cc_derivative(1:end-1) > 0 & cc_derivative(2:end) < 0) + 1;
+maxima_lags = lags(maxima_indices);
+    
+maxima_lags
+
+
+%% Plot the cross-correlation
 plotting=0;
 clf
 figure(1)
@@ -207,24 +229,37 @@ figure(1)
 subplot(2,1,1)
 plot(lags,cc,'LineStyle','-','LineWidth',2)
 hold on
-title("Cross-correlation between AOD 500nm &"+newline+ "Phytoplankton Groups");
+
+i=find(cc==max(cc));
+plot(lags(i),cc(i),'*','MarkerSize',12)
+title("Cross-correlation between AOD 500nm &"+newline+ "Satellite Chlorophyll-a");
 xlabel('Lags (Days)');
 ylabel('Normalized Cross-correlation');
-xlim([-100 100])
+% xlim([-365 365])
 
 subplot(2,1,2)
 yyaxis left
 plot(merra_bc_plt.datetime,merra_bc_plt.anomaly,'r')
 hold on 
+ylabel(['BC Surface',newline(),'Mass Concentration Anomaly [g/m^3] '])
+
 yyaxis right
-plot(satellite_chl_MB.datetime,satellite_chl_MB.Chlorophyll)
-plot(satellite_all_2020.Chlorophyll)
+plot(satellite_chl_MB.datetime,satellite_chl_MB.Chlorophyll,'g-')
+ylabel('5-day Chlorophyll-a Anomaly [mg/m^3]');
 xlim([start_date_plot end_date_plot])
 
+set(gcf,'Position',[0 0 1200 800])
+
+
+saving=0;
+if saving==1
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\Xcorr_satellite_chl_climatology_5day_MB_with_merra.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\satellite_chl\Xcorr_satellite_chl_climatology_5day_MB_with_merra.pdf"]);
+end
 
 
 %% Compute Climatolog by grid cell
-data_type = '5day';  % Change as needed: 'daily', '5day', '15day', 'month'
+data_type = 'month';  % Change as needed: 'daily', '5day', '15day', 'month'
 
 results_grid = computeChlorophyllMetricsByGrid(base_path, data_type, 2020, 2020);
 
@@ -247,7 +282,7 @@ subsetMask = (lat >= latBounds(1) & lat <= latBounds(2)) & ...
 % Create a figure and plot mean anomalies
 clf
 figure(1);
-imagesc(lon(1,:), (lat(:, 1)),results_grid.climatology);  % Use imagesc to scale the data to color map
+pcolor(lon(1,:), (lat(:, 1)),results_grid.climatology);  % Use imagesc to scale the data to color map
 shading interp
 col = colorbar;  % Adds a color bar to indicate the scale
 ylabel(col, 'Chlorophyll Concentration (mg/m^3)');  % Label the colorbar
@@ -256,12 +291,12 @@ xlabel('Longitude');
 ylabel('Latitude');
 title('Monterey Bay 2020 Chlorophll-a Climatology');
 
-set(gcf,'Position',[-100 900 1000 500])
+set(gcf,'Position',[0 900 800 600])
 
 saving=0;
 if saving==1
-    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+".png"]);
-    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\physical_drivers\physical_drivers_"+num2str(n_subplot)+".pdf"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\satellite\satellite_chla_2020_climatology.png"]);
+    saveas(gcf, ["C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\Santa_Cruz\figures\satellite\satellite_chla_2020_climatology.pdf"]);
 end
 saving=0;
 

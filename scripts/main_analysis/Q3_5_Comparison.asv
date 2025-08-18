@@ -1,0 +1,2021 @@
+%% Similar Event Comparison
+
+%Events 
+
+%June 2018, April 2020, August 2023
+
+%% IFCB Taxa abundance analysis 
+
+%Add paths
+addpath('Q:\Dante\Wildfire_Obs\functions\')
+addpath('Q:\Dante\Wildfire_Obs\')
+addpath('Q:\Dante\data\MB_Wildfire_Obs\processed_data\')
+
+%IFCB
+load('ifcb_ucsc_all_mean.mat')
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat')
+
+%Load wildfire data
+
+%PM 2.5
+load('Q:\Dante\data\MB_Wildfire_Obs\pm2_5\sc_pm2.5_daily_all.mat')
+
+%Subset to a site
+sc_pm2_5_daily=sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName=="San Lorenzo Valley Middle School",:);
+
+
+
+% Goal: Plot with taxa on y, time lag on the x and 
+
+% Extract the taxa columns and AOD_500nm column
+taxa_data = table2array(ifcbbray(:, [2:52,59]));
+aod_500nm =ifcbbray.AOD_500nm;
+
+% Initialize variables to store coefficients and lags
+cc = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));
+lags = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));  % Corrected dimensions
+
+taxa = ifcbbray.Properties.VariableNames([2:52,59]);
+
+
+
+%%
+close all
+plotting = 1;
+
+sc_pm2_5_daily_join=sc_pm2_5_daily(:,["datetime","pm2_5"]);
+% Process data for the year 2020
+% sc_pm2_5_daily = sc_pm2_5_daily(sc_pm2_5_daily.datetime.Year == 2020, :);
+
+% Merge the sc_pm2_5_daily data with ifcbbray based on datetime
+ifcb_pm25 = outerjoin(ifcbbray, sc_pm2_5_daily_join, 'Keys', 'datetime', 'MergeKeys', true, 'Type', 'left');
+
+
+% Assuming ifcb_pm25 is already loaded into the workspace
+
+% Extract the taxa columns and AOD_500nm column
+ifcb_taxa_sel=ifcb_pm25(:, [2:52,59]);
+taxa_data = table2array(ifcb_taxa_sel);
+pm25 = ifcb_pm25.pm2_5;
+
+%% June 2018
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+start_date = datetime(2018, 5, 15);
+end_date = datetime(2018, 7, 15);
+start_date_lim=datetime(2018, 5, 1);
+end_date_lim = datetime(2018, 8, 1);
+
+shade_start = datetime(2018,6,1);
+shade_end = datetime(2018,6,30);
+ % --- Filter Taxa based on Significant Adjusted P-values and CC >= 0.6 --- %
+
+% Load the previous table with significant taxa
+previous_table = readtable('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\tables\all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa;
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+% Filter taxa with max CC >= 0.6 and keep only those
+valid_taxa = significant_taxa(contains(significant_taxa, '*'));  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+extended_color_map = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    0.3, 0.7, 0.3;  % Deep Green
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7];   % Medium gray (for "Other Taxa")
+
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2018, 5, 15) datetime(2018, 7, 15)]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+legend(legend_labels, 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 4.5, 3]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\taxa_abundance_june2018.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\taxa_abundance_june2018.pdf');
+end
+
+
+
+
+%% Load the data
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+predictor_vars = {'temperature', 'BEUTI', 'wspd_along', 'AOD_500nm', ...
+                  'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+                   'Phosphate', 'Silicate', 'Ammonium', 'outflow', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+
+%% Dates for plotting
+
+
+
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Define the variables and corresponding high/low colors
+variables = {'temperature', 'BEUTI', 'wspd_along', 'outflow', ...
+             'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+             'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#1e0db8', ...
+               '#bc5090', '#f0c76e', '#ede32b', '#0ad125', '#ffb6c1','#d62728'};
+
+low_colors = {'#5698e8', '#b9e3a1', '#71d3de', '#c1bbfc', ...
+              '#ffa600', '#5bd4c8', '#afdef0', '#c7c5c1', '#4682b4','#2ca02c'};
+
+% Create a table with the variables and corresponding colors
+color_table = table(variables', high_colors', low_colors', ...
+                    'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+
+%Plotting Specs
+linewdt=2;
+
+
+
+%% Group1: Time Series and Anomalies Plotting for Group3 Variables
+
+% Define the variables for Group1
+group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'temperature', 'wspd_along', ...
+               'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+group1_titles = {'PM2.5 SLV', 'Temperature', 'Wind Speed', 'Surface PAR', 'Silicate'};
+group1_ylabels = {'PM2.5 [μg/m³]', 'Temperature [deg C]', 'Wind Speed [m/s]',"PAR"+newline+"[μmol photons m⁻² s⁻¹]", 'Silicate [μmol L^{-1}]'};
+
+
+%% Plot Group1 Time Series with Helvetica Font and Adjusted Dimensions for Publication
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year 
+    year_filter = physical_forcings_biology_table.datetime.Year == 2018;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), ...
+             'Color', color_plt, 'LineWidth', linewdt);
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Add lines for key dates and shaded area
+        % xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2018, 1, 1, 'TimeZone', 'UTC'), datetime(2018, 12, 31, 'TimeZone', 'UTC')]);  % Set x-axis limits for the full year
+
+        % Adjust y-axis limits dynamically based on data
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data) * 1.2, max(y_data) * 1.2]);  % Add padding to the data range
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Optional: Save the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\group1_timeseries_june2018.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\group1_timeseries_june2018.pdf');
+end
+
+%% Group1 Anomalies Plot
+figure;
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot (5 rows, 1 column)
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        %Case specific limits
+        if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+            ylim([-20 400])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'temperature')
+            ylim([-7 7])
+        elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+            ylim([-800 800])
+        end
+
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', 16);
+        title(predictor_title);
+        hold on;
+
+        % Add key lines and shaded areas
+        % xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        xlim([datenum(datetime(2018,1,1)) datenum(datetime(2018,12,31))]);
+        datetick('x', 'keeplimits');
+        set(gca, 'FontSize', 14);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+
+%% Save Group1 Anomalies Plot if required
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.pdf");
+end
+
+
+%% Group: Time Series and Anomalies Plotting for Group 2 Variables
+
+group2_vars = {'Nitrate','Phosphate', 'Ammonium','BEUTI','outflow'};
+group2_titles = {'Nitrate', 'Phosphate', 'Ammonium','BEUTI','Outflow'};
+group2_ylabels = {'Nitrate [μmol L^{-1}]','Phosphate [μmol L^{-1}]',...
+    'Ammonium [μmol L^{-1}]','BEUTI', 'Outflow [m³/s]'};
+
+
+
+
+%% Plot Group 2 Time Series
+figure;
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), 'Color', color_plt, 'LineWidth', 2);
+        ylabel(predictor_ylabel);
+        title(predictor_title);
+        hold on;
+
+        % Add lines for key dates and shading
+        % xline(czu_date, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2018,1,1,'TimeZone','UTC') datetime(2018,12,31,'TimeZone','UTC')]);  % Set x-axis limits using datetime
+
+        % Adjust limits to fit data dynamically
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data)*1.2 max(y_data)*1.2]);  % Add padding to the data
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+%% Save Group 2 Time Series Plot if required
+saving = 1;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2018.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2018.pdf");
+end
+
+
+%% Group 2 Anomalies Plot
+%% Plot Group 2 Anomalies with Helvetica Font and Publication-Ready Format
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Set case-specific y-limits for certain predictors
+        if strcmp(predictor, 'Nitrate')
+            ylim([-10 20])
+        elseif strcmp(predictor, 'Phosphate')
+            ylim([-1.5 1.5])
+        elseif strcmp(predictor, 'Ammonium')
+            ylim([-8 20])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 1000])
+        end
+
+        % Add key lines and shaded areas
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        
+        % Set x-axis limits and format date ticks
+        xlim([datenum(datetime(2018,1,1)) datenum(datetime(2018,12,31))]);
+        datetick('x', 'keeplimits');
+        
+        % Set font size and style for axes
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2018.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2018.pdf');
+end
+
+
+
+%% April 2020
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 4, 23);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 5, 8);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+start_date_lim=datetime(2020, 4, 15);
+start_date_lim.TimeZone = 'UTC';
+end_date_lim = datetime(2020, 6, 1);
+end_date_lim.TimeZone = 'UTC';
+
+shade_start=start_date;
+shade_end=end_date;
+
+
+% Load the previous table with significant taxa
+% previous_table = readtable('all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa;
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+valid_taxa = significant_taxa;  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+taxa_abundances.datetime.TimeZone='UTC';
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+extended_color_map = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    0.3, 0.7, 0.3;  % Deep Green
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7];   % Medium gray (for "Other Taxa")
+
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([start_date_lim end_date_lim]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date_lim:caldays(7):end_date_lim);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+legend(legend_labels, 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.8]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 4]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\taxa_abundance_april2020.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\taxa_abundance_april2020.pdf');
+end
+
+
+
+
+%% Load the data
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+predictor_vars = {'temperature', 'BEUTI', 'wspd_along', 'AOD_500nm', ...
+                  'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+                   'Phosphate', 'Silicate', 'Ammonium', 'outflow', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+
+%% Dates for plotting
+
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 3, 1);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 7, 1);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+
+czu_date = datetime(2020, 8, 21);
+czu_date.TimeZone = 'UTC';
+
+august_date = datetime(2020, 9, 11);
+august_date.TimeZone = 'UTC';
+% shade_start = datetime(2020,6,1);
+% shade_start.TimeZone = 'UTC';
+% shade_end = datetime(2020,7,1);
+% shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Define the variables and corresponding high/low colors
+variables = {'temperature', 'BEUTI', 'wspd_along', 'outflow', ...
+             'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+             'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#1e0db8', ...
+               '#bc5090', '#f0c76e', '#ede32b', '#0ad125', '#ffb6c1','#d62728'};
+
+low_colors = {'#5698e8', '#b9e3a1', '#71d3de', '#c1bbfc', ...
+              '#ffa600', '#5bd4c8', '#afdef0', '#c7c5c1', '#4682b4','#2ca02c'};
+
+% Create a table with the variables and corresponding colors
+color_table = table(variables', high_colors', low_colors', ...
+                    'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+
+%Plotting Specs
+linewdt=2;
+
+
+
+%% Group1: Time Series and Anomalies Plotting for Group3 Variables
+
+% Define the variables for Group1
+group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'temperature', 'wspd_along', ...
+               'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+group1_titles = {'PM2.5 SLV', 'Temperature', 'Wind Speed', 'Surface PAR', 'Silicate'};
+group1_ylabels = {'PM2.5 [μg/m³]', 'Temperature [deg C]', 'Wind Speed [m/s]',"PAR"+newline+"[μmol photons m⁻² s⁻¹]", 'Silicate [μmol L^{-1}]'};
+
+
+%% Plot Group1 Time Series with Helvetica Font and Adjusted Dimensions for Publication
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year (2020)
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), ...
+             'Color', color_plt, 'LineWidth', linewdt);
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Add lines for key dates and shaded area
+        % xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2020, 1, 1, 'TimeZone', 'UTC'), datetime(2020, 12, 31, 'TimeZone', 'UTC')]);  % Set x-axis limits for the full year
+
+        % Adjust y-axis limits dynamically based on data
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data) * 1.2, max(y_data) * 1.2]);  % Add padding to the data range
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Optional: Save the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.pdf');
+end
+
+%% Group1 Anomalies Plot
+figure;
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot (5 rows, 1 column)
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        %Case specific limits
+        if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+            ylim([-20 400])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'temperature')
+            ylim([-7 7])
+        elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+            ylim([-800 800])
+        end
+
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', 16);
+        title(predictor_title);
+        hold on;
+
+        % Add key lines and shaded areas
+        % xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        set(gca, 'FontSize', 14);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+
+%% Save Group1 Anomalies Plot if required
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.pdf");
+end
+
+
+%% Group: Time Series and Anomalies Plotting for Group 2 Variables
+
+group2_vars = {'Nitrate','Phosphate', 'Ammonium','BEUTI','outflow'};
+group2_titles = {'Nitrate', 'Phosphate', 'Ammonium','BEUTI','Outflow'};
+group2_ylabels = {'Nitrate [μmol/L]','Phosphate [μmol/L]',...
+    'Ammonium [μmol/L]','BEUTI', 'Outflow [m³/s]'};
+
+
+
+
+%% Plot Group 2 Time Series
+figure;
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), 'Color', color_plt, 'LineWidth', 2);
+        ylabel(predictor_ylabel);
+        title(predictor_title);
+        hold on;
+
+        % Add lines for key dates and shading
+        % xline(czu_date, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2020,1,1,'TimeZone','UTC') datetime(2020,12,31,'TimeZone','UTC')]);  % Set x-axis limits using datetime
+
+        % Adjust limits to fit data dynamically
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data)*1.2 max(y_data)*1.2]);  % Add padding to the data
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+%% Save Group 2 Time Series Plot if required
+saving = 1;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2020.pdf");
+end
+
+
+%% Group 2 Anomalies Plot
+%% Plot Group 2 Anomalies with Helvetica Font and Publication-Ready Format
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Set case-specific y-limits for certain predictors
+        if strcmp(predictor, 'Nitrate')
+            ylim([-10 20])
+        elseif strcmp(predictor, 'Phosphate')
+            ylim([-1.5 1.5])
+        elseif strcmp(predictor, 'Ammonium')
+            ylim([-8 20])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 1000])
+        end
+
+        % Add key lines and shaded areas
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        
+        % Set x-axis limits and format date ticks
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        
+        % Set font size and style for axes
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2020.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2020.pdf');
+end
+
+%% August 2023
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+start_date = datetime(2023, 8, 1);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2018, 9, 1);
+end_date.TimeZone = 'UTC';
+start_date_lim=datetime(2023, 7, 1);
+end_date_lim = datetime(2023, 9, 1);
+
+shade_start = datetime(2023,8,1);
+shade_start.TimeZone = 'UTC';
+shade_end = datetime(2023,8,30);
+shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Select taxa
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, significant_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% Create a colormap with distinct and contrasting colors for each unique group
+num_groups = length(significant_indices) + 1;  % Including 'Other Taxa'
+new_color_map = distinguishable_bright_colors(num_groups);  % Generate a colormap with distinct colors
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([start_date_lim end_date_lim]);  % Adjust as necessary
+
+% Apply custom color map with default color for 'Other Taxa'
+new_color_map = [colorz(1:length(significant_indices), :); defaultColor];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every five days
+set(gca, 'XTick', start_date_lim:caldays(7):end_date_lim);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells/L', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a legend excluding datetime
+legend(new_variable_names(1:end-1), 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+% line_dates = [datetime(2020, 8, 18), datetime(2020, 9, 22)];
+line_heights = [1, 1];
+% bar(line_dates, line_heights, 'BarWidth', 0.0005, 'FaceColor', 'k', 'EdgeColor', 'none');
+
+% Adjust y-limits
+ylim([0 7e5])
+
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 2.5]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Define the variables and corresponding high/low colors
+variables = {'sea_water_temperature', 'BEUTI', 'wspd_along', 'outflow', ...
+             'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+             'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#1e0db8', ...
+               '#bc5090', '#f0c76e', '#ede32b', '#0ad125', '#ffb6c1','#d62728'};
+
+low_colors = {'#5698e8', '#b9e3a1', '#71d3de', '#c1bbfc', ...
+              '#ffa600', '#5bd4c8', '#afdef0', '#c7c5c1', '#4682b4','#2ca02c'};
+
+% Create a table with the variables and corresponding colors
+color_table = table(variables', high_colors', low_colors', ...
+                    'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+
+%Plotting Specs
+linewdt=2;
+
+
+
+%% Group1: Time Series and Anomalies Plotting for Group3 Variables
+
+% Define the variables for Group1
+group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'sea_water_temperature', 'wspd_along', ...
+               'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+group1_titles = {'PM2.5 SLV', 'Temperature', 'Wind Speed', 'Surface PAR', 'Silicate'};
+group1_ylabels = {'PM2.5 [μg/m³]', 'Temperature [deg C]', 'Wind Speed [m/s]',"PAR"+newline+"[μmol photons m⁻² s⁻¹]", 'Silicate [μmol/L]'};
+
+
+%% Plot Group1 Time Series with Helvetica Font and Adjusted Dimensions for Publication
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year 
+    year_filter = physical_forcings_biology_table.datetime.Year == 2018;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), ...
+             'Color', color_plt, 'LineWidth', linewdt);
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Add lines for key dates and shaded area
+        % xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2018, 1, 1, 'TimeZone', 'UTC'), datetime(2023, 12, 31, 'TimeZone', 'UTC')]);  % Set x-axis limits for the full year
+
+        % Adjust y-axis limits dynamically based on data
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data) * 1.2, max(y_data) * 1.2]);  % Add padding to the data range
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Optional: Save the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\group1_timeseries_june2023.png');
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\comparative_analysis\group1_timeseries_june2023.pdf');
+end
+
+%% Group1 Anomalies Plot
+figure;
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot (5 rows, 1 column)
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        %Case specific limits
+        if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+            ylim([-20 400])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'sea_water_temperature')
+            ylim([-7 7])
+        elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+            ylim([-800 800])
+        end
+
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', 16);
+        title(predictor_title);
+        hold on;
+
+        % Add key lines and shaded areas
+        % xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        xlim([datenum(datetime(2023,1,1)) datenum(datetime(2023,12,31))]);
+        datetick('x', 'keeplimits');
+        set(gca, 'FontSize', 14);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+
+%% Save Group1 Anomalies Plot if required
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.pdf");
+end
+
+
+%% Group: Time Series and Anomalies Plotting for Group 2 Variables
+
+group2_vars = {'Nitrate','Phosphate', 'Ammonium','BEUTI','outflow'};
+group2_titles = {'Nitrate', 'Phosphate', 'Ammonium','BEUTI','Outflow'};
+group2_ylabels = {'Nitrate [μmol/L]','Phosphate [μmol/L]',...
+    'Ammonium [μmol/L]','BEUTI', 'Outflow [m³/s]'};
+
+
+
+
+%% Plot Group 2 Time Series
+figure;
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), 'Color', color_plt, 'LineWidth', 2);
+        ylabel(predictor_ylabel);
+        title(predictor_title);
+        hold on;
+
+        % Add lines for key dates and shading
+        % xline(czu_date, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2023,1,1,'TimeZone','UTC') datetime(2023,12,31,'TimeZone','UTC')]);  % Set x-axis limits using datetime
+
+        % Adjust limits to fit data dynamically
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data)*1.2 max(y_data)*1.2]);  % Add padding to the data
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+%% Save Group 2 Time Series Plot if required
+saving = 1;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2023.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2023.pdf");
+end
+
+
+%% Group 2 Anomalies Plot
+%% Plot Group 2 Anomalies with Helvetica Font and Publication-Ready Format
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Set case-specific y-limits for certain predictors
+        if strcmp(predictor, 'Nitrate')
+            ylim([-10 20])
+        elseif strcmp(predictor, 'Phosphate')
+            ylim([-1.5 1.5])
+        elseif strcmp(predictor, 'Ammonium')
+            ylim([-8 20])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 1000])
+        end
+
+        % Add key lines and shaded areas
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        
+        % Set x-axis limits and format date ticks
+        xlim([datenum(datetime(2023,1,1)) datenum(datetime(2023,12,31))]);
+        datetick('x', 'keeplimits');
+        
+        % Set font size and style for axes
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2023.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2023.pdf');
+end
+
+
+
+%% April 2020
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 4, 23);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 7, 1);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+start_date_lim=datetime(2020, 4, 15);
+end_date_lim = datetime(2020, 6, 1);
+
+
+czu_date = datetime(2020, 8, 21);
+czu_date.TimeZone = 'UTC';
+
+august_date = datetime(2020, 9, 11);
+august_date.TimeZone = 'UTC';
+shade_start = datetime(2020,4,23);
+shade_start.TimeZone = 'UTC';
+shade_end = datetime(2020,5,15);
+shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Select taxa
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, significant_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% Create a colormap with distinct and contrasting colors for each unique group
+num_groups = length(significant_indices) + 1;  % Including 'Other Taxa'
+new_color_map = distinguishable_bright_colors(num_groups);  % Generate a colormap with distinct colors
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([start_date_lim end_date_lim]);  % Adjust as necessary
+
+% Apply custom color map with default color for 'Other Taxa'
+new_color_map = [colorz(1:length(significant_indices), :); defaultColor];
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(new_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every five days
+set(gca, 'XTick', start_date_lim:caldays(7):end_date_lim);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('Cells/L', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a legend excluding datetime
+legend(new_variable_names(1:end-1), 'Location', 'bestoutside', 'AutoUpdate', 'off', 'FontSize', ftsz, 'FontName', ftname);
+
+% Optional: Adding a solid line bar at specific dates
+hold on;
+% line_dates = [datetime(2020, 8, 18), datetime(2020, 9, 22)];
+line_heights = [1, 1];
+% bar(line_dates, line_heights, 'BarWidth', 0.0005, 'FaceColor', 'k', 'EdgeColor', 'none');
+
+% Adjust y-limits
+ylim([0 1e6])
+
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+fill([shade_start, shade_start, shade_end, shade_end], ...
+     [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Adjust 'FaceAlpha' for transparency
+xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 2.5]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+
+
+%% Load the data
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+predictor_vars = {'sea_water_temperature', 'BEUTI', 'wspd_along', 'AOD_500nm', ...
+                  'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+                   'Phosphate', 'Silicate', 'Ammonium', 'outflow', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+
+%% Dates for plotting
+
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 3, 1);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 7, 1);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+
+czu_date = datetime(2020, 8, 21);
+czu_date.TimeZone = 'UTC';
+
+august_date = datetime(2020, 9, 11);
+august_date.TimeZone = 'UTC';
+% shade_start = datetime(2020,6,1);
+% shade_start.TimeZone = 'UTC';
+% shade_end = datetime(2020,7,1);
+% shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Define the variables and corresponding high/low colors
+variables = {'sea_water_temperature', 'BEUTI', 'wspd_along', 'outflow', ...
+             'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+             'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#1e0db8', ...
+               '#bc5090', '#f0c76e', '#ede32b', '#0ad125', '#ffb6c1','#d62728'};
+
+low_colors = {'#5698e8', '#b9e3a1', '#71d3de', '#c1bbfc', ...
+              '#ffa600', '#5bd4c8', '#afdef0', '#c7c5c1', '#4682b4','#2ca02c'};
+
+% Create a table with the variables and corresponding colors
+color_table = table(variables', high_colors', low_colors', ...
+                    'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+
+%Plotting Specs
+linewdt=2;
+
+
+
+%% Group1: Time Series and Anomalies Plotting for Group3 Variables
+
+% Define the variables for Group1
+group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'sea_water_temperature', 'wspd_along', ...
+               'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+group1_titles = {'PM2.5 SLV', 'Temperature', 'Wind Speed', 'Surface PAR', 'Silicate'};
+group1_ylabels = {'PM2.5 [μg/m³]', 'Temperature [deg C]', 'Wind Speed [m/s]',"PAR"+newline+"[μmol photons m⁻² s⁻¹]", 'Silicate [μmol/L]'};
+
+
+%% Plot Group1 Time Series with Helvetica Font and Adjusted Dimensions for Publication
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year (2020)
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), ...
+             'Color', color_plt, 'LineWidth', linewdt);
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Add lines for key dates and shaded area
+        % xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2020, 1, 1, 'TimeZone', 'UTC'), datetime(2020, 12, 31, 'TimeZone', 'UTC')]);  % Set x-axis limits for the full year
+
+        % Adjust y-axis limits dynamically based on data
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data) * 1.2, max(y_data) * 1.2]);  % Add padding to the data range
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Optional: Save the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.pdf');
+end
+
+%% Group1 Anomalies Plot
+figure;
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot (5 rows, 1 column)
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        %Case specific limits
+        if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+            ylim([-20 400])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'sea_water_temperature')
+            ylim([-7 7])
+        elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+            ylim([-800 800])
+        end
+
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', 16);
+        title(predictor_title);
+        hold on;
+
+        % Add key lines and shaded areas
+        % xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        set(gca, 'FontSize', 14);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+
+%% Save Group1 Anomalies Plot if required
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies_2020.pdf");
+end
+
+
+%% Group: Time Series and Anomalies Plotting for Group 2 Variables
+
+group2_vars = {'Nitrate','Phosphate', 'Ammonium','BEUTI','outflow'};
+group2_titles = {'Nitrate', 'Phosphate', 'Ammonium','BEUTI','Outflow'};
+group2_ylabels = {'Nitrate [μmol/L]','Phosphate [μmol/L]',...
+    'Ammonium [μmol/L]','BEUTI', 'Outflow [m³/s]'};
+
+
+
+
+%% Plot Group 2 Time Series
+figure;
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), 'Color', color_plt, 'LineWidth', 2);
+        ylabel(predictor_ylabel);
+        title(predictor_title);
+        hold on;
+
+        % Add lines for key dates and shading
+        % xline(czu_date, 'Color', 'k', 'LineWidth', 2, 'LineStyle', ':');
+        % xline(lag_date, 'Color', '#cf572b', 'LineWidth', 2, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2020,1,1,'TimeZone','UTC') datetime(2020,12,31,'TimeZone','UTC')]);  % Set x-axis limits using datetime
+
+        % Adjust limits to fit data dynamically
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data)*1.2 max(y_data)*1.2]);  % Add padding to the data
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+%% Save Group 2 Time Series Plot if required
+saving = 1;
+if saving == 1
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2020.png");
+    saveas(gcf, "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries_2020.pdf");
+end
+
+
+%% Group 2 Anomalies Plot
+%% Plot Group 2 Anomalies with Helvetica Font and Publication-Ready Format
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Set case-specific y-limits for certain predictors
+        if strcmp(predictor, 'Nitrate')
+            ylim([-10 20])
+        elseif strcmp(predictor, 'Phosphate')
+            ylim([-1.5 1.5])
+        elseif strcmp(predictor, 'Ammonium')
+            ylim([-8 20])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 1000])
+        end
+
+        % Add key lines and shaded areas
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        
+        % Set x-axis limits and format date ticks
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        
+        % Set font size and style for axes
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16, 10]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2020.png');
+    print(gcf, '-dpdf', '-r300', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies_2020.pdf');
+end

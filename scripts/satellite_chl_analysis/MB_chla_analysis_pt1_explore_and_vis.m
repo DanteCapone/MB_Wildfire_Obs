@@ -8,7 +8,7 @@ addpath('Q:\Dante\')
 
 %% Using Monthly Data first
 %% Define the file path for Chlorophyll data
-file_path = 'E:\satellite_chl\2020\C2020_chl_month';
+file_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl\2020\C2020_chl_5day';
 
 %% List all HDF files in the directory
 files = dir(fullfile(file_path, '*.hdf'));
@@ -38,7 +38,7 @@ subsetMask = (lat >= latBounds(1) & lat <= latBounds(2)) & ...
 hFig = figure;
 axis tight manual;
 
-filename = 'E:\satellite_chl\animations\chlDataAnimationmonthly_2020.gif';
+filename = 'Q:\Dante\Wildfire_Obs\animations\chlDataAnimation5day_2020.gif';
 
 for f = 1:length(fileNames)
     fullFilePath = fullfile(file_path, fileNames{f});
@@ -226,7 +226,7 @@ end
 %% Daily data
 
 %% Define the file path for Chlorophyll data
-file_path = 'E:\satellite_chl\2020\C2020_chl_day';
+file_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl\2020\C2020_chl_day';
 
 %% List all HDF files in the directory
 files = dir(fullfile(file_path, '*.hdf'));
@@ -256,7 +256,7 @@ subsetMask = (lat >= latBounds(1) & lat <= latBounds(2)) & ...
 hFig = figure;
 axis tight manual;
 
-filename = 'E:\satellite_chl\animations\chlDataAnimationdaily_2020.gif';
+filename = 'Q:\Dante\Wildfire_Obs\animations\chlDataAnimationdaily_2020.gif';
 
 for f = 1:length(fileNames)
     fullFilePath = fullfile(file_path, fileNames{f});

@@ -55,6 +55,9 @@ load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat'
 load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
 
 
+% Nutrient Deposition
+% load('iron_deposition.mat')
+
 
 %% Set plotting specs
 % Set publication settings
@@ -126,8 +129,8 @@ colorz = [
     0.75, 0.1, 0;        % Darker shade of Red
     0.3333, 0.6588, 0.4078;  % Green
     0.1882, 0.2784, 0.7;        % Blue
-    0.7882, 0.4588, 0.9216   % Pastel Purple
-];
+    0.7882, 0.4588, 0.9216];   % Pastel Purple
+
 
 ftsz=8;
 linewdt=1;
@@ -137,7 +140,10 @@ close all;
 figure()
 
 % PM 2.5 Plot
-subplot(num_subplots, 1, 1)
+figure()
+t = tiledlayout(3,1, 'TileSpacing', 'compact', 'Padding', 'compact');
+nexttile
+
 yyaxis left;
 plot(sc_pm2_5_daily_slv.dayOfYear(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
     sc_pm2_5_daily_slv.pm2_5(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
@@ -156,28 +162,31 @@ alpha(0.5)
 ylim([0 30])
 xlim([1 365])
 hold on;
-ylabel(["Average PM 2.5 (\mu g m^{-3})"], 'FontSize', ftsz, 'FontName', ftname);
+ylabel(["Average PM 2.5" + newline + "(\mu g m^{-3})"], 'FontSize', ftsz, 'FontName', ftname);
 
 %Add shading
-xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
-fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
-    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
-    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
-xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+% xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+% fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+%     [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+%     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+% xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
 
 ax = gca;
 ax.FontSize = ftsz-1;
 ax.FontName = ftname;
 ax.XTickLabelRotation=45;
+set(gca, 'XTickLabel', []);
+
+
 if legend_on == 1
     legend({'Climatology', '2020'}, 'FontSize', ftsz, 'FontName', ftname,'Location','northwest')
 end
 
 % Add "a)" label
-text(-0.1, 1.2, 'c', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+text(-0.21, 1.1, 'c', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
 
 % AOD Plot
-subplot(num_subplots, 1, 2)
+nexttile
 yyaxis left;
 plot(Monterey_lvl_1_5.Day_of_Year(Monterey_lvl_1_5.datetime.Year == 2020), ...
     Monterey_lvl_1_5.AOD_500nm(Monterey_lvl_1_5.datetime.Year == 2020), ...
@@ -189,22 +198,25 @@ xlim([0 365])
 
 yyaxis right;
 plotClimatology5day(Monterey_lvl_1_5(~ismember(Monterey_lvl_1_5.datetime.Year, fire_years), :), 'AOD_500nm')
+ylabel(["Average AOD" + newline + "500nm"], 'FontSize', ftsz, 'FontName', ftname);
+
 alpha(0.1)
 ylim([0 0.2])
 xlim([1 365])
 hold on;
 %Add shading
-xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
-fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
-    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
-    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
-xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+% xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+% fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+%     [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+%     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+% xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
 
 
 ax = gca;
 ax.FontSize = ftsz-1;
 ax.FontName = ftname;
 ax.XTickLabelRotation=45;
+set(gca, 'XTickLabel', []);
 
 if legend_on == 1
     legend({'Climatology (2003-present)', '2020'}, 'FontSize', ftsz, 'FontName', ftname)
@@ -214,10 +226,10 @@ ax.FontSize = ftsz-1;
 ax.FontName = ftname;
 
 % Add "b)" label
-text(-0.1, 1.2, 'd', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+text(-0.21, 1, 'd', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
 
 % Black Carbon Mass Plot
-subplot(num_subplots, 1, 3)
+nexttile
 
 yyaxis left;
 plot(merra_bc_plt.dayOfYear(merra_bc_plt.datetime.Year == 2020), ...
@@ -236,11 +248,11 @@ ylim([3e-7 12e-7])
 xlim([1 365])
 hold on;
 %Add shading
-xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
-fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
-    [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
-    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
-xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+% xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-'); 
+% fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+%     [0, max(ylim) * 1.5, max(ylim) * 1.5 0], ...
+%     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2); 
+% xline(end_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
 
 ax = gca;
 ax.FontSize = ftsz-1;
@@ -254,10 +266,10 @@ if legend_on == 1
 end
 
 % Add "c)" label
-text(-0.1, 1.2, 'e', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
+text(-0.21, 1, 'e', 'Units', 'normalized', 'FontSize', ftsz+2, 'FontName', ftname,'FontWeight','bold');
 
 % Adjust figure size for publication (double-column width)
-set(gcf, 'Units', 'inches', 'Position', [0, 0, 2.5, 5]);  % 7.16 inches width and 8 inches height for subplots
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 2.5, 3.6]);  % 5 inches width and 5 inches height for subplots
 set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
 
 % Save the figure if required
@@ -309,7 +321,7 @@ ax.FontName = ftname;
 
 
 % Add 'a' label to upper left of first plot
-annotation('textbox', [0.03, 0.91, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+annotation('textbox', [0.05, 0.91, 0.03, 0.05], 'String', '\bf{a}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
 
 
 
@@ -348,7 +360,7 @@ legend({'Climatology', '2020'}, 'FontSize', ftsz, 'FontName', ftname, ...
     'Location', 'northwest','AutoUpdate','off');
 
 % Add 'b' label to upper left of first plot
-annotation('textbox', [0.03, 0.62, 0.03, 0.05], 'String', '\bf{b}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+annotation('textbox', [0.05, 0.62, 0.03, 0.05], 'String', '\bf{b}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
 
 
 % Satellite
@@ -429,7 +441,7 @@ ax.FontName = ftname;
 legend({'Climatology','Shadow', 'Full Bay'}, 'FontSize', ftsz, 'FontName', ftname, 'Location', 'northwest','AutoUpdate','off');
 
 % Add 'c' label to upper left of 3rd plot
-annotation('textbox', [0.03, 0.3, 0.03, 0.05], 'String', '\bf{c}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
+annotation('textbox', [0.05, 0.3, 0.03, 0.05], 'String', '\bf{c}', 'FontSize', ftsz+4, 'FontName', ftname, 'LineStyle', 'none');
 
 % Create an invisible axis for the shared label (for yyaxis left)
 han_left = axes(gcf, 'visible', 'off');
@@ -1577,6 +1589,868 @@ end
 
 %% VI. Physical Drivers
 
+%% Load the data
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+addpath('Q:\Dante\Wildfire_Obs\functions')
+
+% Calculate N:P Ratio (Nitrate/Phosphate) and add to table
+physical_forcings_biology_table.N_P_ratio = physical_forcings_biology_table.Nitrate ./ physical_forcings_biology_table.Phosphate;
+
+predictor_vars = {'temperature', 'BEUTI', 'wspd_along', 'AOD_500nm', ...
+                  'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+                   'Phosphate', 'Silicate', 'Ammonium', 'outflow', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+
+
+%% Dates for plotting
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 8, 16);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 9, 22);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+
+czu_date = datetime(2020, 8, 21);
+czu_date.TimeZone = 'UTC';
+
+august_date = datetime(2020, 9, 11);
+august_date.TimeZone = 'UTC';
+shade_start = datetime(2020,8,16);
+shade_start.TimeZone = 'UTC';
+shade_end = datetime(2020,9,22);
+shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+% Define the variables and corresponding high/low colors
+variables = {'temperature', 'BEUTI', 'wspd_along','wspd_across','AOD_500nm', 'outflow', ...
+             'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+             'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt','N_P_ratio'};
+
+high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#5bb4b3', '#5831b8', ...
+               '#bc5090', '#5831b8', '#ff6f61', '#ede32b', '#0ad125', '#ffb6c1','#d62728','#d62728'};
+
+low_colors  = {'#5698e8', '#b9e3a1', '#71d3de', '#f2a950', '#a89ff3', ...
+               '#ffa600', '#a89ff3', '#6baed6', '#afdef0', '#c7c5c1', '#4682b4','#2ca02c','#2ca02c'};
+
+% Create a table with the variables and corresponding colors
+color_table = table(variables', high_colors', low_colors', ...
+                    'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+
+%Plotting Specs
+linewdt=2;
+
+% Define the variables for Group1
+group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'temperature', 'wspd_along','wspd_across', ...
+               'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+group1_titles = {'PM2.5 SLV', 'Temperature', 'Alongshore Wind Speed','Acrossshore Wind Speed', 'Surface PAR', 'Silicate'};
+
+
+letters = 'abcdefghijklmnopqrstuvwxyz'; % Letters for labeling
+
+group2_vars = {'Nitrate', 'Phosphate', 'Ammonium', 'BEUTI', 'outflow', 'N_P_ratio'};
+group2_titles = {'Nitrate', 'Phosphate', 'Ammonium', 'BEUTI', 'Outflow', 'N:P Ratio'};
+
+
+
+%% Group1: Time Series and Anomalies Plotting 
+
+
+% Set publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year (2020)
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), ...
+             'Color', color_plt, 'LineWidth', linewdt);
+        ylabel(predictor_ylabel, 'FontSize', ftsz, 'FontName', ftname);
+        title(predictor_title, 'FontSize', ftsz, 'FontName', ftname);
+        hold on;
+
+        % Add lines for key dates and shaded area
+        xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+        xlim([datetime(2020, 1, 1, 'TimeZone', 'UTC'), datetime(2020, 12, 31, 'TimeZone', 'UTC')]);  % Set x-axis limits for the full year
+
+        % Adjust y-axis limits dynamically based on data
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data) * 1.2, max(y_data) * 1.2]);  % Add padding to the data range
+
+        hold off;
+
+        ylabel(predictor_ylabel, 'FontSize', ftsz);
+        xlabel("")
+        text(0.02, 0.95, predictor_title, ...
+            'Units', 'normalized', ...
+            'FontSize', ftsz, ...
+            'FontName', ftname, ...
+            'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'top');        
+        hold on;
+        title("")
+
+
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Optional: Save the figure with high resolution for publication
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_timeseries.pdf');
+end
+
+%% Group 1 anomalies
+figure;
+for idx = 1:length(group1_vars)
+    predictor = group1_vars{idx};
+    predictor_title = group1_titles{idx};
+    predictor_ylabel = group1_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group1_vars), 1, idx);  % Create a subplot (length(group1_vars) rows, 1 column)
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Case-specific limits
+        if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+            ylim([-20 400])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'temperature')
+            ylim([-7 7])
+        elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+            ylim([-800 800])
+        end
+
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz);
+        xlabel("")
+        text(0.02, 1.25, predictor_title, ...
+            'Units', 'normalized', ...
+            'FontSize', ftsz, ...
+            'FontName', ftname, ...
+            'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'top');        
+        hold on;
+        title("")
+
+        % Add key lines and shaded areas
+        xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
+        xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        set(gca, 'FontSize', ftsz);
+
+        % Only show x-axis tick labels on the bottom subplot
+        if idx < length(group1_vars)
+            set(gca, 'XTickLabel', []);
+        end
+
+        % Add subplot label in the upper-left corner
+        text(-0.05, 1.25, letters(idx), 'Units', 'normalized', 'FontSize', ftsz + 2, ...
+             'FontName', ftname, 'FontWeight', 'bold');
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+
+% Save Group1 Anomalies Plot if required
+if saving == 1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies.png");
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group1_anomalies.pdf");
+end
+
+
+%% Group 2: Time Series and Anomalies Plotting
+
+
+%% Plot Group 2 Time Series
+figure;
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color for this variable
+    row = strcmp(color_table.Variable, predictor);
+    color_plt = color_table.HighColor{row};  % High (positive) color
+
+    % Filter for the selected year
+    year_filter = physical_forcings_biology_table.datetime.Year == 2020;
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Plot the predictor with a 14-day moving average
+        plot(physical_forcings_biology_table.datetime(year_filter), ...
+             fillmissing(physical_forcings_biology_table.(predictor)(year_filter), 'linear'), 'Color', color_plt, 'LineWidth', 1);
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz);
+        xlabel("")
+        text(0.02, 0.95, predictor_title, ...
+            'Units', 'normalized', ...
+            'FontSize', ftsz, ...
+            'FontName', ftname, ...
+            'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'top');        
+        hold on;
+        title("")
+
+        hold on;
+
+        % Add Redfield ratio line for N:P Ratio subplot
+        if strcmp(predictor, 'N_P_ratio')
+            redfield_value = 16;
+            yline(redfield_value, 'k--', 'LineWidth', 1, 'DisplayName', 'Redfield Ratio (16)');
+        end
+
+        % Add lines for key dates and shading
+        xline(czu_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', ':');
+        xline(lag_date, 'Color', '#cf572b', 'LineWidth', 1.5, 'LineStyle', ':');
+        xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+        fill([shade_start, shade_start, shade_end, shade_end], [min(ylim) * 1.2, max(ylim) * 1.2, max(ylim) * 1.2, min(ylim) * 1.2], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);  % Shaded region
+        xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+        xlim([datetime(2020,1,1,'TimeZone','UTC') datetime(2020,12,31,'TimeZone','UTC')]);  % Set x-axis limits using datetime
+
+        % Adjust limits to fit data dynamically
+        y_data = movmean(physical_forcings_biology_table.(predictor)(year_filter), 1);
+        ylim([min(y_data)*1.2 max(y_data)*1.2]);  % Add padding to the data
+
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Apply consistent font settings across the figure
+set(findall(gcf, '-property', 'FontName'), 'FontName', ftname, 'FontSize', ftsz);
+
+% Save Group 2 Time Series Plot if required
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries.png");
+    print(gcf, '-dpng', '-r1200', "C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_timeseries.pdf");
+end
+
+%% Group 2 Anomalies Plot
+% Plot Group 2 Anomalies with Helvetica Font and Publication-Ready Format
+
+% Set publication settings
+ftsz = 8;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 2;  % Line width for plotting
+
+figure;
+
+letters = 'ghijklmnopqrstuvwxyz'; % Starting with 'f'
+
+for idx = 1:length(group2_vars)
+    predictor = group2_vars{idx};
+    predictor_title = group2_titles{idx};
+    predictor_ylabel = group2_ylabels{idx};
+
+    % Find the color pair for this variable from the color_table
+    row = strcmp(color_table.Variable, predictor);
+    hcolor = color_table.HighColor{row};  % High (positive) color
+    lcolor = color_table.LowColor{row};   % Low (negative) color
+
+    % Check if the current predictor exists in the data
+    if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+        subplot(length(group2_vars), 1, idx);  % Create a subplot for each variable
+
+        % Calculate and plot the anomaly for the current predictor
+        shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                            physical_forcings_biology_table.(predictor), ...
+                            hcolor, lcolor);
+        
+        % Add labels, titles, and other plot elements
+        ylabel(predictor_ylabel, 'FontSize', ftsz);
+        xlabel("")
+        text(0.02, 1.25, predictor_title, ...
+            'Units', 'normalized', ...
+            'FontSize', ftsz, ...
+            'FontName', ftname, ...
+            'FontWeight', 'bold', ...
+            'HorizontalAlignment', 'left', ...
+            'VerticalAlignment', 'top');        
+        hold on;
+        title("")
+
+        % Set case-specific y-limits for certain predictors
+        if strcmp(predictor, 'Nitrate')
+            ylim([-10 10])
+        elseif strcmp(predictor, 'Phosphate')
+            ylim([-1.5 1.5])
+        elseif strcmp(predictor, 'Ammonium')
+            ylim([-8 8])
+        elseif strcmp(predictor, 'outflow')
+            ylim([-300 300])
+        elseif strcmp(predictor, 'N_P_ratio')
+            ylim([-40 40])  % Set reasonable limits for N:P ratio
+        end
+        % Add key lines and shaded areas
+        xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
+        xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', ':');
+        xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+             [min(ylim) * 1.25, max(ylim) * 1.25, max(ylim) * 1.25, min(ylim) * 1.25], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+        xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+        xlim([datenum(datetime(2020,1,1)) datenum(datetime(2020,12,31))]);
+        datetick('x', 'keeplimits');
+        
+        % Set font size and style for axes
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        % Only show x-axis tick labels on the bottom subplot
+        if idx < length(group1_vars)
+            set(gca, 'XTickLabel', []);
+        end
+
+        % Add subplot label in the upper-left corner
+        text(-0.05, 1.25, letters(idx), 'Units', 'normalized', 'FontSize', ftsz + 2, ...
+             'FontName', ftname, 'FontWeight', 'bold');
+        hold off;
+    else
+        fprintf('Variable %s not found in the dataset.\n', predictor);
+    end
+end
+
+% Adjust figure size for double-column width and appropriate height
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);  % 7.16 inches width and 10 inches height for subplots
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Save the figure if required
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\physical_drivers\anomalies\group2_anomalies.pdf');
+end
+
+
+%% Figure 7. 2 column anomalies plot
+
+group1_ylabels = [ ...
+    "[μg m^{-3}]", ...
+    "[°C]", ...
+    "[m s^{-1}] N ←→ S", ...
+    "[m s^{-1}] W ←→ E", ...
+    "[μmol photons"+newline+"m⁻² s⁻¹]", ...
+    "[μmol ^{-1}]" ...
+];
+group2_ylabels = {'[μmol L^{-1}]', '[μmol L^{-1}]', '[μmol L^{-1}]', '', '[m³ s^{-1}]', ''};
+
+% Settings
+ftsz = 8;  
+ftname = 'Helvetica';  
+linewdt = 1;  
+saving = 1;
+
+% Create figure and layout
+n1 = length(group1_vars);
+n2 = length(group2_vars);
+nrows = max(n1, n2);
+figure;
+t = tiledlayout(nrows, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% letters = 'abcdefghijklmnopqrstuvwxyz'; % Letters for labeling
+letters = 'agbhcidjekfl'; % Letters for labeling
+
+% Loop through rows and columns
+for rowIdx = 1:nrows
+    for colIdx = 1:2
+        if colIdx == 1 && rowIdx <= n1
+            predictor     = group1_vars{rowIdx};
+            predictor_title = group1_titles{rowIdx};
+            predictor_ylabel = group1_ylabels{rowIdx};
+        elseif colIdx == 2 && rowIdx <= n2
+            predictor     = group2_vars{rowIdx};
+            predictor_title = group2_titles{rowIdx};
+            predictor_ylabel = group2_ylabels{rowIdx};
+        else
+            continue;
+        end
+
+        % Get colors
+        row = strcmp(color_table.Variable, predictor);
+        hcolor = color_table.HighColor{row};
+        lcolor = color_table.LowColor{row};
+
+        if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+            ax = nexttile((rowIdx - 1) * 2 + colIdx);
+
+            % Plot anomalies
+            shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                physical_forcings_biology_table.(predictor), ...
+                hcolor, lcolor);
+
+            % Custom y-limits
+            if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+                ylim([-20 400]);
+            elseif strcmp(predictor, 'outflow')
+                ylim([-300 300]);
+            elseif strcmp(predictor, 'temperature')
+                ylim([-7 7]);
+            elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+                ylim([-800 800]);
+            elseif strcmp(predictor, 'Nitrate')
+                ylim([-10 10]);
+            elseif strcmp(predictor, 'Phosphate')
+                ylim([-1.5 1.5]);
+            elseif strcmp(predictor, 'Ammonium')
+                ylim([-8 8]);
+            elseif strcmp(predictor, 'N_P_ratio')
+                ylim([-40 40]);
+            end
+
+            % Axes & labels
+            ylabel(predictor_ylabel, 'FontSize', ftsz);
+            if rowIdx == nrows
+                xlabel('Date');
+            else
+                set(gca, 'XTickLabel', []);
+            end
+            set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+            % Titles as overlayed text (not axis title)
+            text(0.02, 1.2, predictor_title, ...
+                'Units', 'normalized', ...
+                'FontSize', ftsz, ...
+                'FontName', ftname, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'left', ...
+                'VerticalAlignment', 'top');
+
+            % Subplot label (e.g., a, b, c...)
+            subplot_idx = (rowIdx - 1) * 2 + colIdx;
+            text(-0.05, 1.15, letters(subplot_idx), ...
+                'Units', 'normalized', ...
+                'FontSize', ftsz + 2, ...
+                'FontName', ftname, ...
+                'FontWeight', 'bold');
+            xlabel('')
+            title("")
+            % Lines and shaded region
+            xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
+            xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', ':');
+            xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+            xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+
+            fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+                [min(ylim)*1.25, max(ylim)*1.25, max(ylim)*1.25, min(ylim)*1.25], ...
+                [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.4);
+
+        % Set x-axis limits
+        start_date = datenum(datetime(2020,3,1));
+        end_date   = datenum(datetime(2020,12,31));
+        xlim([start_date end_date]);
+        
+        % Only show x-axis ticks and labels on the bottom row of each column
+        isBottomRow_Group1 = (colIdx == 1) && (rowIdx == n1);
+        isBottomRow_Group2 = (colIdx == 2) && (rowIdx == n2);
+        
+        if isBottomRow_Group1 || isBottomRow_Group2
+            monthly_ticks = datenum(2020, 1:12, 15);
+            monthly_labels = datestr(monthly_ticks, 'mmm');  % 'Jan', 'Feb', etc.
+            set(gca, 'XTick', monthly_ticks, ...
+                     'XTickLabel', cellstr(monthly_labels), ...
+                     'XTickLabelRotation', 45, ...
+                     'TickDir', 'out');
+        else
+            set(gca, 'XTickLabel', []);
+        end
+        else
+            fprintf('Variable %s not found.\n', predictor);
+        end
+    end
+end
+
+% Size the figure: 5 in wide, 6 in tall
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);
+set(gcf, 'PaperPositionMode', 'auto');
+
+% Save
+saving=0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\fig7_physical_var_anomalies_short.png');
+    print(gcf, '-dpdf', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\fig7_physical_var_anomalies_short.pdf');
+end
+
+
+%% Figure S8 of Time Series
+
+ftsz    = 8;
+ftname  = 'Helvetica';
+linewdt = 2;
+saving  = 0;
+
+% Optional light smoothing (set to 1 for no smoothing)
+smooth_window = 1;   % e.g., 7 or 14 for moving average; 1 = raw
+
+% Create figure and layout
+n1 = length(group1_vars);
+n2 = length(group2_vars);
+nrows = max(n1, n2);
+
+figure;
+t = tiledlayout(nrows, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+% panel letters (left->right, top->bottom)
+letters = 'agbhcidjekfl';
+
+% Filter for 2020 once
+yrMask = physical_forcings_biology_table.datetime.Year == 2020;
+
+for rowIdx = 1:nrows
+    for colIdx = 1:2
+        % Pick which group/slot to draw
+        if colIdx == 1 && rowIdx <= n1
+            predictor        = group1_vars{rowIdx};
+            predictor_title  = group1_titles{rowIdx};
+            predictor_ylabel = group1_ylabels{rowIdx};
+        elseif colIdx == 2 && rowIdx <= n2
+            predictor        = group2_vars{rowIdx};
+            predictor_title  = group2_titles{rowIdx};
+            predictor_ylabel = group2_ylabels{rowIdx};
+        else
+            continue;
+        end
+
+        % Color for this variable
+        r = strcmp(color_table.Variable, predictor);
+        if ~any(r) || ~ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+            fprintf('Variable %s not found.\n', predictor);
+            continue;
+        end
+        color_plt = color_table.HighColor{r};
+
+        % Data for 2020
+        t2020 = physical_forcings_biology_table.datetime(yrMask);
+        y2020 = physical_forcings_biology_table.(predictor)(yrMask);
+        % Fill gaps and (optionally) smooth
+        y2020 = fillmissing(y2020, 'linear');
+        if smooth_window > 1
+            y2020 = movmean(y2020, smooth_window, 'omitnan');
+        end
+
+        % Plot
+        ax = nexttile((rowIdx - 1) * 2 + colIdx);
+        plot(t2020, y2020, 'LineWidth', linewdt, 'Color', color_plt); hold on;
+
+        % Dynamic y-limits with padding, except for N:P Ratio
+        if strcmp(predictor, 'N_P_ratio')
+            ylim([0 40]);
+        else
+            ymin = min(y2020, [], 'omitnan');
+            ymax = max(y2020, [], 'omitnan');
+            if ~isfinite(ymin) || ~isfinite(ymax) || ymin==ymax
+                ymin = 0; ymax = 1; % fallback
+            end
+            pad  = 0.12 * max(1, abs(ymax - ymin));
+            ylim([ymin - pad, ymax + pad]);
+        end
+
+        % Vertical lines (use datetimes you already defined)
+        xline(czu_date,     'Color', 'k',      'LineWidth', 1, 'LineStyle', ':');
+        xline(lag_date,     'Color', '#cf572b','LineWidth', 1, 'LineStyle', ':');
+        xline(shade_start,  'Color', 'k',      'LineWidth', 1, 'LineStyle', '-');
+        xline(shade_end,    'Color', 'k',      'LineWidth', 1, 'LineStyle', '-');
+
+        % Shaded window for fire period
+        yl = ylim;
+        fill([shade_start shade_start shade_end shade_end], ...
+             [yl(1) yl(2) yl(2) yl(1)], ...
+             [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.35);
+
+        % Axes, labels, fonts
+        xlim([datetime(2020,1,1,'TimeZone','UTC'), datetime(2020,12,31,'TimeZone','UTC')]);
+        ylabel(predictor_ylabel, 'FontSize', ftsz-2, 'FontName', ftname);
+        set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+        % Only show x ticks on the bottom row of each column
+        isBottomRow_Group1 = (colIdx == 1) && (rowIdx == n1);
+        isBottomRow_Group2 = (colIdx == 2) && (rowIdx == n2);
+        if isBottomRow_Group1 || isBottomRow_Group2
+            monthly_ticks  = datetime(2020, 1:12, 15, 'TimeZone', 'UTC');
+            monthly_labels = cellstr(datestr(datenum(2020,1:12,15), 'mmm'));
+            xticks(monthly_ticks);
+            xticklabels(monthly_labels);
+            xtickangle(45);
+            set(gca, 'TickDir', 'out');
+            xlabel(''); % keep empty to match your style
+        else
+            set(gca, 'XTickLabel', []);
+        end
+
+        % Overlayed title text (not axis title)
+        text(0.02, 1.18, predictor_title, 'Units','normalized', ...
+             'FontSize', ftsz, 'FontName', ftname, 'FontWeight','bold', ...
+             'HorizontalAlignment','left', 'VerticalAlignment','top');
+
+        % Subplot letter
+        subplot_idx = (rowIdx - 1) * 2 + colIdx;
+        if subplot_idx <= numel(letters)
+            text(-0.06, 1.12, letters(subplot_idx), 'Units','normalized', ...
+                 'FontSize', ftsz+2, 'FontName', ftname, 'FontWeight','bold');
+        end
+
+        % Clean up axis extras
+        title(''); xlabel('');
+        hold off;
+    end
+end
+
+% Figure size
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6.1]);
+set(gcf, 'PaperPositionMode', 'auto');
+
+% Save if wanted
+saving=1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\figs8_physical_vars_timeseries.png');
+    print(gcf, '-dpdf', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\figs8_physical_vars_timeseries.pdf');
+end
+
+
+%% Figure S. Anomaly Time Series for 2018
+
+ftsz    = 8;
+ftname  = 'Helvetica';
+linewdt = 1;
+saving  = 0;
+
+plotYear = 2018;   % <<< change year here if needed
+
+% Create figure and layout
+n1 = length(group1_vars);
+n2 = length(group2_vars);
+nrows = max(n1, n2);
+figure;
+t = tiledlayout(nrows, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+letters = 'agbhcidjekfl'; % panel letters
+
+for rowIdx = 1:nrows
+    for colIdx = 1:2
+        if colIdx == 1 && rowIdx <= n1
+            predictor         = group1_vars{rowIdx};
+            predictor_title   = group1_titles{rowIdx};
+            predictor_ylabel  = group1_ylabels{rowIdx};
+        elseif colIdx == 2 && rowIdx <= n2
+            predictor         = group2_vars{rowIdx};
+            predictor_title   = group2_titles{rowIdx};
+            predictor_ylabel  = group2_ylabels{rowIdx};
+        else
+            continue;
+        end
+
+        % Colors
+        row = strcmp(color_table.Variable, predictor);
+        hcolor = color_table.HighColor{row};
+        lcolor = color_table.LowColor{row};
+
+        if ismember(predictor, physical_forcings_biology_table.Properties.VariableNames)
+            ax = nexttile((rowIdx - 1) * 2 + colIdx);
+
+            % Plot anomalies
+            shade_anomaly_month(physical_forcings_biology_table.datetime, ...
+                physical_forcings_biology_table.(predictor), ...
+                hcolor, lcolor);
+
+            % Custom y-limits (same as your original)
+            if strcmp(predictor, 'pm2_5_sc_pm2_5_daily_slv_tt')
+                ylim([-20 100]);
+            elseif strcmp(predictor, 'outflow')
+                ylim([-300 300]);
+            elseif strcmp(predictor, 'temperature')
+                ylim([-7 7]);
+            elseif strcmp(predictor, 'surface_downwelling_photosynthetic_photon_flux_in_air')
+                ylim([-800 800]);
+            elseif strcmp(predictor, 'Nitrate')
+                ylim([-15 15]);
+            elseif strcmp(predictor, 'Phosphate')
+                ylim([-1.5 1.5]);
+            elseif strcmp(predictor, 'Ammonium')
+                ylim([-10 10]);
+            elseif strcmp(predictor, 'N_P_ratio')
+                ylim([-10 10]); % (use 0–40 if you want the ratio panel fixed to absolute range)
+            end
+
+            % Axes & labels
+            ylabel(predictor_ylabel, 'FontSize', ftsz);
+            if rowIdx == nrows
+                xlabel('Date');
+            else
+                set(gca, 'XTickLabel', []);
+            end
+            set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+            % Titles as overlayed text
+            text(0.02, 1.2, predictor_title, ...
+                'Units','normalized','FontSize', ftsz, 'FontName', ftname, ...
+                'FontWeight','bold','HorizontalAlignment','left','VerticalAlignment','top');
+
+            % Subplot letter
+            subplot_idx = (rowIdx - 1) * 2 + colIdx;
+            text(-0.05, 1.15, letters(subplot_idx), 'Units','normalized', ...
+                'FontSize', ftsz + 2, 'FontName', ftname, 'FontWeight', 'bold');
+
+            xlabel(''); title('');
+
+            % ----- Optional vertical lines & shaded window (only if they are in 2018) -----
+            % helper to check year of datenum
+            toYear = @(dn) year(datetime(dn,'ConvertFrom','datenum'));
+
+            if exist('lag_date_datenum','var') && toYear(lag_date_datenum)==plotYear
+                xline(lag_date_datenum, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
+            end
+            if exist('czu_date_datenum','var') && toYear(czu_date_datenum)==plotYear
+                xline(czu_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', ':');
+            end
+            if exist('start_date_datenum','var') && toYear(start_date_datenum)==plotYear
+                xline(start_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+            end
+            if exist('end_date_datenum','var') && toYear(end_date_datenum)==plotYear
+                xline(end_date_datenum, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+            end
+            if exist('shade_start_datenum','var') && exist('shade_end_datenum','var') && ...
+               toYear(shade_start_datenum)==plotYear && toYear(shade_end_datenum)==plotYear
+                yl = ylim;
+                fill([shade_start_datenum, shade_start_datenum, shade_end_datenum, shade_end_datenum], ...
+                    [yl(1)*1.25, yl(2)*1.25, yl(2)*1.25, yl(1)*1.25], ...
+                    [0.6509 0.8078 0.8902], 'EdgeColor','none','FaceAlpha',0.4);
+            end
+            % ---------------------------------------------------------------------------
+
+            % X‑axis limits & ticks for the chosen year
+            xlim([datenum(datetime(plotYear,3,1)) datenum(datetime(plotYear,12,31))]);
+
+            isBottomRow_Group1 = (colIdx == 1) && (rowIdx == n1);
+            isBottomRow_Group2 = (colIdx == 2) && (rowIdx == n2);
+
+            if isBottomRow_Group1 || isBottomRow_Group2
+                monthly_ticks  = datenum(plotYear, 1:12, 15);
+                monthly_labels = datestr(monthly_ticks, 'mmm');
+                set(gca, 'XTick', monthly_ticks, ...
+                    'XTickLabel', cellstr(monthly_labels), ...
+                    'XTickLabelRotation', 45, ...
+                    'TickDir', 'out');
+            else
+                set(gca, 'XTickLabel', []);
+            end
+        else
+            fprintf('Variable %s not found.\n', predictor);
+        end
+    end
+end
+
+% Size the figure: 5 in wide, 6 in tall
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 6]);
+set(gcf, 'PaperPositionMode', 'auto');
+
+% Save
+saving=1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\figs6_physical_var_anomalies_2018.png');
+    print(gcf, '-dpdf', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\figs6_physical_var_anomalies_2018.pdf');
+end
+
+
+
 
 %% VII. Supplemental
 close all
@@ -1677,14 +2551,14 @@ disp(explainedVariance(1:10));
 close all; figure;
 
 for i = 1:3
-    subplot(3, 1, i);
+    subplot(1, 3, i);
     %Apply masks for upwelling shadows, experiment with which seem most
     %viable
     eofMap = NaN(size(subsetMask));
     eofMap(subsetMask) = EOFs(:, i);    
     imagesc(lon(1,:), lat(:,1), eofMap);
 
-    titleText = sprintf('EOF %d (%.2f%% variance explained)', i, explainedVariance(i));
+    titleText = sprintf("EOF %d"+newline+"(%.2f%% variance explained)", i, explainedVariance(i));
     title(titleText);    shading interp;
     colormap jet;
     colorbar;
@@ -1698,7 +2572,10 @@ for i = 1:3
 
         imagesc(lon(1,:), lat(:,1), eofMap);
 
-        title('EOF 2 Upwelling Shadow Mask');
+        
+
+        title("EOF 2"+newline+"Upwelling Shadow Mask",'FontSize',ftsz,'FontWeight','normal');
+        
         shading interp;
         colormap parula;
         colorbar;
@@ -1706,14 +2583,14 @@ for i = 1:3
     end
 
 
-    xlabel('Longitude (°)');
-    ylabel('Latitude (°)');
+    % xlabel('Longitude (°)');
+    % ylabel('Latitude (°)');
     set(gca, 'YDir', 'normal');
 end
 
 % sgtitle('Monterey Bay Chlorophyll 5-day EOFS (1-9)')
 % Set figure size for double-column width and aspect ratio (for L&O)
-set(gcf, 'Units', 'inches', 'Position', [0, 0, 7.16-4.5, 6]);  % 7.16 inches width and height to maintain aspect ratio
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 1]);  % 7.16 inches width and height to maintain aspect ratio
 set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
 % Save figure with the required font and size for publication
 
@@ -1726,10 +2603,12 @@ saving = 0;
 
 
 %% Figure S3: HABS Taxa and Correlation with Biovolume
+
 % Ensure datetime columns are formatted correctly
 HABs_SantaCruzWharf_clean.datetime = datetime(HABs_SantaCruzWharf_clean.datetime, 'Format', 'yyyy-MM-dd');
+% HABs_SantaCruzWharf_clean.datetime.TimeZone='UTC';
 ifcb_nass_morpho_2016_2023.datetime = datetime(ifcb_nass_morpho_2016_2023.datetime, 'Format', 'yyyy-MM-dd');
-
+ifcb_nass_morpho_2016_2023.datetime.TimeZone='';
 % Define date range (April - December 2020)
 start_date = datetime(2020, 4, 1);
 end_date = datetime(2020, 12, 31);
@@ -1756,11 +2635,19 @@ mask_HABs_2020 = year(HABs_SantaCruzWharf_clean.datetime) == 2020;
 mask_IFCB_2020 = year(ifcb_nass_morpho_2016_2023.datetime) == 2020;
 
 %% Create figure with 3 subplots
-
+HABs_SantaCruzWharf_clean.datetime.TimeZone='';
+ifcb_ucsc_all_mean.datetime.TimeZone='';
 %Add shading
 start_date = datetime(2020, 8, 16);
+start_date.TimeZone='';
+shade_start.TimeZone='';
 end_date = datetime(2020, 9, 22);
+end_date.TimeZone='';
+shade_end.TimeZone='';
 lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone='';
+
+linewdt=1;
 
 figure;
 
@@ -1775,33 +2662,55 @@ color_Alexandrium = '#50e678';  % Green
 color_Dinophysis = '#cf572b';   % Orange-Red
 color_PseudoNitzschia = '#1f77b4'; % Blue
 
+color_Alexandrium_dark = '#2fa84e';
+color_Dinophysis_dark = '#9b3f1d';
+color_PseudoNitzschia_dark = '#155185';
+
+
+
+% Plot Alexandrium from IFCB (dashed)
+p4 = plot(ifcb_ucsc_all_mean.datetime, ifcb_ucsc_all_mean.Alexandrium_singlet, ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Alexandrium_dark, ...
+    'DisplayName', '\it{Alexandrium} (IFCB)');
+
+% Plot Dinophysis from IFCB (dashed)
+p5 = plot(ifcb_ucsc_all_mean.datetime, ifcb_ucsc_all_mean.Dinophysis, ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Dinophysis_dark, ...
+    'DisplayName', '\it{Dinophysis} (IFCB)');
+
+% Plot Pseudo-nitzschia from IFCB (dashed)
+p6 = plot(ifcb_ucsc_all_mean.datetime, ifcb_ucsc_all_mean.Pseudo_nitzschia, ...
+    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_PseudoNitzschia_dark, ...
+    'DisplayName', '\it{Pseudo-nitzschia} (IFCB)');
+
 % Plot Alexandrium spp.
 p1=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), HABs_SantaCruzWharf_clean.Alexandrium_spp(mask_HABs_2020), ...
-    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Alexandrium, ...
+    'LineStyle', 'none', 'LineWidth', linewdt, 'Marker', 'o', 'MarkerSize', 2, 'Color', color_Alexandrium, ...
     'DisplayName', '\it{Alexandrium} spp.');
 
 % Plot Dinophysis spp.
 p2=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), ...
     HABs_SantaCruzWharf_clean.Dinophysis_spp(mask_HABs_2020), ...
-    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_Dinophysis, ...
+    'LineStyle', 'none', 'LineWidth', linewdt, 'Marker', 'o', 'MarkerSize', 2, 'Color', color_Dinophysis, ...
     'DisplayName', '\it{Dinophysis} spp.');
 % Plot Pseudo-nitzschia seriata group
 p3=plot(HABs_SantaCruzWharf_clean.datetime(mask_HABs_2020), HABs_SantaCruzWharf_clean.Pseudo_nitzschia_seriata_group(mask_HABs_2020), ...
-    'LineStyle', '-', 'LineWidth', linewdt, 'Color', color_PseudoNitzschia, ...
+    'LineStyle', 'none', 'LineWidth', linewdt, 'Marker', 'o', 'MarkerSize', 2, 'Color', color_PseudoNitzschia, ...
     'DisplayName', '\it{Pseudo-nitzschia seriata} group');
 
+
 % Add vertical reference lines
-xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+xline(start_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
 
 % Shaded region
 fill([shade_start, shade_start, shade_end, shade_end], ...
-    [min(ylim) * 0.9, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 0.9], ...
-    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
+    [min(ylim)*0.6, max(ylim) * 2, max(ylim) * 2, min(ylim)*0.6], ...
+    [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.1);
 
-
-
+xlim([datetime(2020, 4, 1), datetime(2020, 12, 31)]); % Limit x-axis to April - December
+ylim([0 0.9e5]);
 % Set labels and title
 ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
 
@@ -1814,9 +2723,16 @@ ax.XTickLabelRotation=45;
 % ylim([0, 7e1]);  % Scale Y-axis for better visualization
 
 % Add legend with italicized text and turn off auto-update
-legend([p1, p2, p3], {'\it{Alexandrium}', '\it{Dinophysis}', '\it{PN. seriata}'}, ...
-    'Location', 'northeast', 'FontSize', 8);
-text(-0.08, 0.97, 'a', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
+lgd = legend([p1, p2, p3], ...
+    {'\it{Alexandrium}', '\it{Dinophysis}', '\it{Pseudo-nitzchia}'}, ...
+    'Orientation', 'horizontal', ...
+    'FontSize', ftsz - 1, ...
+    'NumColumns', 3, ...
+    'Location', 'southoutside');
+
+% Shrink line length in legend entries
+lgd.ItemTokenSize = [8, 10];  % [length, height]
+text(-0.15, 1.04, 'a', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
 
 
 % **Subplot 2: Chlorophyll & Biovolume Time Series**
@@ -1834,13 +2750,13 @@ ylabel('Chlorophyll (mg m^{-3})', 'FontSize', ftsz, 'FontName', ftname);
 ylim([0 35]);
 
 % Add vertical reference lines
-xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+xline(start_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
 
 % Shaded region
 fill([shade_start, shade_start, shade_end, shade_end], ...
-    [min(ylim) * 0.9, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 0.9], ...
+    [min(ylim)*0.6, max(ylim) * 2, max(ylim) * 2, min(ylim)*0.6], ...
     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);
 
 % Right y-axis for TotalSum (Red)
@@ -1858,7 +2774,7 @@ ax1 = gca;
 ax1.XTick = datetime(2020,1,1):calmonths(1):datetime(2020,12,31);
 xlim([datetime(2020, 4, 1), datetime(2020, 12, 31)]); % Limit x-axis to April - December
 % legend('show', 'Location', 'bestoutside', 'FontSize', ftsz,'AutoUpdate','off');
-text(-0.08, 0.97, 'b', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
+text(-0.15, 1.04, 'b', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold'); % Panel Label
 hold off;
 
 
@@ -1889,7 +2805,7 @@ hold off;
 
 
 % Panel Label
-text(-0.08, 0.97, 'c', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
+text(-0.15, 1.04, 'c', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
 hold off;
 
 % === Subplot 4: PAR-adjusted Ratio ===
@@ -1929,9 +2845,9 @@ nexttile
 plot(dt_ratio, residual_ratio, 'Color', [0.1 0.6 0.1], 'LineWidth', 2);
 hold on
 % Add vertical reference lines
-xline(start_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(end_date, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
-xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+xline(start_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(end_date, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', 1, 'LineStyle', ':');
 
 % Shaded region
 fill([shade_start, shade_start, shade_end, shade_end], ...
@@ -1940,19 +2856,17 @@ fill([shade_start, shade_start, shade_end, shade_end], ...
 
 % ylim([0 2]);
 
-xlabel('Date');
-ylabel('Chlorophyll-a: Biovolume (mg m^{-3} \mum^{-3} L^{-1})');
-title('Chlorophyll-a: Biovolume Ratio');
+ylabel('Chl-a: Biovolume','FontSize',ftsz);
 grid on;
 xlim([datetime(2020,4,1) datetime(2020,12,31)]);
-text(-0.08, 0.97, 'd', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
+text(-0.15, 1.04, 'd', 'Units', 'normalized', 'FontSize', ftsz+4, 'FontWeight', 'bold');
 
 % Set figure size for double-column width and aspect ratio (for L&O)
 set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 4]);  % 7.16 inches width and height to maintain aspect ratio
 set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
 
 % Save figure
-saving = 0;
+saving = 1;
 if saving == 1
     print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\fig_s2_calhabmap.png');
     print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\fig_s2_calhabmap.pdf');
@@ -2023,7 +2937,7 @@ set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 6]);
 set(gcf, 'PaperPositionMode', 'auto');  
 
 % Save figure with required font and size for publication
-saving = 0;
+saving = 1;
 if saving == 1
     print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_shannon.png');
     print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\ifcb_shannon.pdf');
@@ -2391,7 +3305,7 @@ saving = 0;
 close all;
 
 % Define years to loop through
-years = 2015:2023;
+years = 2020;
 
 % Define bounds for subsetting
 latBounds = [36.3219, 37.180664]; 
@@ -2429,75 +3343,96 @@ for year = years
     numFiles = length(fileNames);
     if numFiles == 0
         fprintf('No files found for year %d, skipping...\n', year);
-        continue;
+    else 
     end
 
     nRows = ceil(sqrt(numFiles)); 
-    nCols = ceil(numFiles / nRows);
-    figure;
-    t = tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
+nCols = ceil(numFiles / nRows);
+figure;
+t = tiledlayout(nRows, nCols, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-    for f = 1:numFiles
-        fullFilePath = fullfile(file_path, fileNames{f});
-        info = hdfinfo(fullFilePath);
-        dataSetName = info.SDS(1).Name;
-        data = hdfread(fullFilePath, dataSetName);
+for f = 1:numFiles
+    fullFilePath = fullfile(file_path, fileNames{f});
+    info = hdfinfo(fullFilePath);
+    dataSetName = info.SDS(1).Name;
+    data = hdfread(fullFilePath, dataSetName);
 
-        % Coastline mask
-        coastlineMask = data == -1;
-        boundaries = bwboundaries(coastlineMask);
+    % Coastline mask
+    coastlineMask = data == -1;
+    boundaries = bwboundaries(coastlineMask);
 
-        % Correct signed byte issue
-        data = int16(data);
-        data(data < 0) = data(data < 0) + 256;
+    % Correct signed byte issue
+    data = int16(data);
+    data(data < 0) = data(data < 0) + 256;
 
-        % Filter invalid data
-        data(data < 2 | data > 254) = NaN;
-        data(data == 0) = 0.01;
-        data(data == 1 | data == 255) = NaN;
+    % Filter invalid data
+    data(data < 2 | data > 254) = NaN;
+    data(data == 0) = 0.01;
+    data(data == 1 | data == 255) = NaN;
 
-        % Convert pixel values to Chlorophyll concentration
-        chlConcentration = 10.^(0.015 * double(data) - 2.0);
+    % Convert pixel values to Chlorophyll concentration
+    chlConcentration = 10.^(0.015 * double(data) - 2.0);
 
-        % Plot
-        ax = nexttile;
-        imagesc(lon(1,:), lat(:,1), chlConcentration);
-        shading interp;
-        hold on;
-        for b = 1:length(boundaries)
-            boundary = boundaries{b};
-            validIndices = boundary(:,1) <= size(lat,1) & boundary(:,2) <= size(lon,2);
-            if all(validIndices)
-                boundaryLat = lat(sub2ind(size(lat), boundary(validIndices,1), boundary(validIndices,2)));
-                boundaryLon = lon(sub2ind(size(lon), boundary(validIndices,1), boundary(validIndices,2)));
-                plot(boundaryLon, boundaryLat, 'k', 'LineWidth', 1);
-            end
+    % Plot
+    ax = nexttile;
+    imagesc(lon(1,:), lat(:,1), chlConcentration);
+    shading interp;
+    hold on;
+    for b = 1:length(boundaries)
+        boundary = boundaries{b};
+        validIndices = boundary(:,1) <= size(lat,1) & boundary(:,2) <= size(lon,2);
+        if all(validIndices)
+            boundaryLat = lat(sub2ind(size(lat), boundary(validIndices,1), boundary(validIndices,2)));
+            boundaryLon = lon(sub2ind(size(lon), boundary(validIndices,1), boundary(validIndices,2)));
+            plot(boundaryLon, boundaryLat, 'k', 'LineWidth', 1);
         end
-        hold off;
-
-        % Set colormap similar to cmocean chlorophyll
-        colormap(cmocean('algae'));
-        caxis([0.01 15]);
-        title(datestr(fileDates(f), 'mm/dd/yyyy'));
-        set(gca, 'YDir', 'normal');
-
-        % Apply explicit tick positions
-        ax.FontSize = 12;
-        ax.FontName = 'Arial';
-        ax.XTick = xTicks;
-        ax.YTick = yTicks;
-        ax.XTickLabelRotation = 45;
     end
+    hold off;
 
-    % Add a shared colorbar
-    cb = colorbar;
-    cb.Label.String = 'Chlorophyll (mg m^{-3})';
-    cb.Layout.Tile = 'east';  % Aligns with tiled layout
-    cb.FontSize = ftsz+4; % Set colorbar font size
+    % Colormap and range
+    colormap(cmocean('algae'));
+    caxis([0.01 15]);
+    % Smaller subplot titles
+    tt = title(datestr(fileDates(f), 'mm/dd/yyyy'),'FontWeight','bold');
+    ax.FontSize = ftsz;                  % axis tick/label font
+    ax.FontName = 'Arial';
+    ax.TitleFontWeight = 'normal';     % optional: lighter title weight
+    ax.TitleFontSizeMultiplier = 1.2;  % make title smaller than axis font
+    set(gca, 'YDir', 'normal');
 
-    % Set figure size for publication
-    set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 7]);  
-    set(gcf, 'PaperPositionMode', 'auto');
+    % Explicit ticks
+    ax.XTick = xTicks;
+    ax.YTick = yTicks;
+    ax.XTickLabelRotation = 45;
+
+    % Determine row/col for tick label visibility
+    rowIdx = ceil(f / nCols);
+    colIdx = mod(f-1, nCols) + 1;
+
+    if colIdx ~= 1
+        ax.YTickLabel = [];
+    end
+    if rowIdx ~= nRows
+        ax.XTickLabel = [];
+        ax.XTickLabelRotation = 0;
+    end
+    % No per-tile axis labels anymore — shared ones added after loop
+end
+
+% Shared axis labels on the tiledlayout (with degree symbol)
+hx = xlabel(t, 'Longitude (°)');
+hy = ylabel(t, 'Latitude (°)');
+set([hx hy], 'FontName','Arial','FontSize',10);
+
+% Shared colorbar
+cb = colorbar;
+cb.Label.String = 'Chlorophyll (mg m^{-3})';
+cb.Layout.Tile = 'east';
+cb.FontSize = 10;   % or your ftsz+4 if you prefer
+
+% Figure size for publication
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 4]);  
+set(gcf, 'PaperPositionMode', 'auto');
 
     % Save figure
     saving = 1;
@@ -2509,9 +3444,226 @@ for year = years
     saving = 0;
 
     % Close the figure to free memory
-    close(gcf);
+    % close(gcf);
+end
+%% Figure S. Chlorophyll Maps and EOFs
+% --- prereqs/sanity ---
+if ~exist('ftsz','var'); ftsz = 8; end
+assert(exist('lon','var') && exist('lat','var'), 'Need lon/lat grids.');
+assert(exist('subsetMask','var') && exist('EOFs','var') && exist('explainedVariance','var'), ...
+       'Need subsetMask, EOFs(:,1:3), explainedVariance(1:3).');
+
+if ~exist('xTicks','var') || numel(xTicks)~=4
+    xTicks = linspace(min(lon(1,:)), max(lon(1,:)), 4);
+end
+if ~exist('yTicks','var') || numel(yTicks)~=4
+    yTicks = linspace(min(lat(:,1)), max(lat(:,1)), 4);
 end
 
+% consistent geo aspect for EOF row; we'll let the mosaic fill its tiles
+xspan = max(lon(1,:)) - min(lon(1,:));
+yspan = max(lat(:,1)) - min(lat(:,1));
+pba   = [xspan yspan 1];
+
+% --- chlorophyll files (Jul 1–Oct 31) ---
+year = 2020;  % change if needed
+file_path = sprintf('Q:\\Dante\\data\\MB_Wildfire_Obs\\satellite_chl\\%d\\C%d_chl_15day', year, year);
+files = dir(fullfile(file_path, '*.hdf'));
+fileNames = {files.name};
+fileDates = datetime(regexp(fileNames, '\d{7}(?=__comp)', 'match','once'), 'InputFormat','yyyyDDD');
+validIdx  = fileDates >= datetime(year,7,1) & fileDates <= datetime(year,10,31);
+fileNames = fileNames(validIdx);
+fileDates = fileDates(validIdx);
+numFiles  = numel(fileNames);
+assert(numFiles>0, 'No files found for %d in Jul–Oct.', year);
+
+% mosaic grid: 3 columns; rows as needed
+nCols = 3;
+nRows = ceil(numFiles / nCols);
+tileIndex = @(r,c) (r-1)*nCols + c;
+
+chlCLim = [0.01 15];
+
+% --- figure + panels (bigger mosaic; bottom colorbar pushed DOWN) ---
+fig = figure('Units','inches','Position',[0 0 5.5 6]);  % a bit taller for a bigger mosaic
+set(fig,'PaperPositionMode','auto');
+
+left = 0.08; right = 0.92;
+
+% pack the shared colorbar near the bottom edge
+bottomMargin  = 0.01;   % distance from bottom figure edge to bottom of colorbar panel (smaller = lower)
+cbH           = 0.03;   % height of the colorbar panel (small)
+gapMosaic2CB  = 0.006;  % tiny gap between mosaic and the colorbar panel (keep this small to pull bar down)
+topMargin     = 0.02;   % margin at top
+
+% make the mosaic big & compact; EOF gets a smaller top band
+mosaicH       = 0.74;   % BIGGER mosaic block height
+gapTop2Mosaic = 0.008;  % small gap between EOF band and mosaic
+topH          = 1 - (bottomMargin + cbH + gapMosaic2CB + mosaicH + gapTop2Mosaic + topMargin);
+
+pCB     = uipanel('Parent',fig,'Units','normalized','Position',[left, bottomMargin,          right-left, cbH], 'BorderType','none');
+pMosaic = uipanel('Parent',fig,'Units','normalized','Position',[left, bottomMargin+cbH+gapMosaic2CB, right-left, mosaicH], 'BorderType','none');
+pTop    = uipanel('Parent',fig,'Units','normalized','Position',[left, bottomMargin+cbH+gapMosaic2CB+mosaicH+gapTop2Mosaic, right-left, topH], 'BorderType','none');
+
+% ================= EOF row (top panel; smaller band, not matching mosaic size) =================
+Ttop = tiledlayout(pTop, 1, 3, 'TileSpacing','compact', 'Padding','compact');
+EOFaxes = gobjects(1,3);
+for i = 1:3
+    EOFaxes(i) = nexttile(Ttop, i);
+
+    if i == 3
+        eof2 = NaN(size(subsetMask));
+        eof2(subsetMask) = EOFs(:,2);
+        mask = eof2 > 8e-3;
+        img  = zeros(size(eof2)); img(mask) = 1;
+        imagesc(lon(1,:), lat(:,1), img);
+        colormap(EOFaxes(i), parula); caxis([0 1]);
+        ttl = sprintf('EOF 2 Upwelling \nShadow Mask');  % line break after "EOF 2"
+    else
+        img = NaN(size(subsetMask));
+        img(subsetMask) = EOFs(:, i);
+        imagesc(lon(1,:), lat(:,1), img);
+        colormap(EOFaxes(i), jet);
+        ttl = sprintf('EOF %d\n(%.2f%% variance)', i, explainedVariance(i)); % line break after "EOF x"
+    end
+
+    set(EOFaxes(i), 'YDir','normal','FontName','Arial','FontSize',ftsz);
+    xticks(EOFaxes(i), xTicks); yticks(EOFaxes(i), yTicks);
+    pbaspect(EOFaxes(i), pba);  % keep true map aspect on EOF row
+
+    set(get(EOFaxes(i),'Title'),'String', ttl, 'FontName','Arial', 'FontSize', ftsz, 'FontWeight','normal');
+
+    EOFaxes(i).XTickLabel = [];        % no x tick labels on EOF row
+    if i ~= 1, EOFaxes(i).YTickLabel = []; end  % y labels only on left-most
+
+    colorbar(EOFaxes(i), 'Location','eastoutside');  % slim per-panel bars under EOFs
+end
+text(EOFaxes(1), -0.3, 1.06, 'a', 'Units','normalized', ...
+    'FontWeight','bold', 'FontName','Arial', 'FontSize', ftsz+4);
+
+% ================= Mosaic (bigger + compact) =================
+Tgrid = tiledlayout(pMosaic, nRows, nCols, 'TileSpacing','compact');
+
+mosaicAxes = gobjects(0);
+for f = 1:numFiles
+    r = floor((f-1)/nCols) + 1;
+    c = mod(f-1, nCols) + 1;
+    ax = nexttile(Tgrid, (r-1)*nCols + c);
+    mosaicAxes(end+1) = ax; %#ok<AGROW>
+
+    fpath = fullfile(file_path, fileNames{f});
+    info  = hdfinfo(fpath);
+    data  = hdfread(fpath, info.SDS(1).Name);
+
+    coastMask  = data == -1;
+    boundaries = bwboundaries(coastMask);
+
+    data = int16(data);
+    data(data < 0) = data(data < 0) + 256;
+    data(data < 2 | data > 254) = NaN;
+    data(data == 0) = 0.01;
+    data(data == 1 | data == 255) = NaN;
+
+    chl = 10.^(0.015 * double(data) - 2.0);
+
+    imagesc(lon(1,:), lat(:,1), chl); hold(ax,'on');
+    for b = 1:numel(boundaries)
+        boundary = boundaries{b};
+        vb = boundary(:,1) <= size(lat,1) & boundary(:,2) <= size(lon,2);
+        if all(vb)
+            bLat = lat(sub2ind(size(lat), boundary(vb,1), boundary(vb,2)));
+            bLon = lon(sub2ind(size(lon), boundary(vb,1), boundary(vb,2)));
+            plot(ax, bLon, bLat, 'k', 'LineWidth', 1);
+        end
+    end
+    hold(ax,'off');
+
+    colormap(ax, cmocean('algae')); caxis(ax, chlCLim);
+    set(ax, 'YDir','normal','FontName','Arial','FontSize',ftsz);
+    set(get(ax,'Title'),'String', datestr(fileDates(f), 'mm/dd/yyyy'), 'FontName','Arial','FontSize',ftsz,'FontWeight','normal');
+
+    xticks(ax, xTicks); yticks(ax, yTicks);
+    ax.XTickLabelRotation = 45;
+
+    % IMPORTANT: do NOT force pbaspect on the mosaic; let tiles stretch to be more compact
+    % pbaspect(ax, pba);  % <— intentionally omitted for a denser mosaic
+
+    if c ~= 1, ax.YTickLabel = []; end
+    if r ~= nRows, ax.XTickLabel = []; ax.XTickLabelRotation = 0; end
+end
+
+% shared axis labels on the mosaic grid
+set(xlabel(Tgrid,'Longitude (°)'),'FontName','Arial','FontSize', ftsz+1);
+set(ylabel(Tgrid,'Latitude (°)' ),'FontName','Arial','FontSize', ftsz+1);
+
+
+
+% panel 'b' on the top-left mosaic tile
+if ~isempty(mosaicAxes)
+    axTL = mosaicAxes(1);
+    text(axTL, -0.08, 1.06, 'b', 'Units','normalized', ...
+        'FontWeight','bold', 'FontName','Arial', 'FontSize', ftsz+4);
+end
+
+
+% === RIGHT colorbar spanning the full MOSAIC height (label on TOP, less tight) ===
+axPos = cell2mat(get(mosaicAxes,'Position'));   % [x y w h], normalized to pMosaic
+mLeft   = min(axPos(:,1));
+mRight  = max(axPos(:,1)+axPos(:,3));
+mBottom = min(axPos(:,2));
+mTop    = max(axPos(:,2)+axPos(:,4));
+mHeight = mTop - mBottom;
+
+% Give the cbar more breathing room
+cbGap  = 0.040;   % more gap between mosaic tiles and bar (was 0.02)
+cbW    = 0.030;   % a touch wider so ticks/label aren’t cramped
+padTop = 0.016;   % extra headroom for top tick/label
+padBot = 0.016;   % extra footroom for bottom tick
+
+% Place entirely inside pMosaic
+rightReserve = 0.006;                         % keep a little right margin inside panel
+cbX = min(mRight + cbGap, 1 - cbW - rightReserve);
+cbY = max(mBottom - 0.000, 0.002);
+cbH = max(mHeight - (padTop + padBot), 0.02);
+
+% Host + colorbar
+cbHost = axes('Parent', pMosaic, 'Units','normalized', ...
+              'Position',[cbX cbY cbW cbH], 'Visible','off', 'Box','off');
+colormap(cbHost, cmocean('algae'));
+set(cbHost, 'CLim', chlCLim);
+
+cb = colorbar(cbHost, 'Location','eastoutside');   % ticks on right
+cb.Units    = 'normalized';
+cb.Position = [cbX cbY cbW cbH];                   % lock rectangle
+cb.Box      = 'off';
+cb.FontSize = ftsz;
+
+% Label on top, slightly nudged right
+cb.Label.String              = '';
+cb.Label.Units               = 'normalized';
+cb.Label.Rotation            = 0;                  % horizontal
+cb.Label.HorizontalAlignment = 'center';
+cb.Label.VerticalAlignment   = 'bottom';
+cb.Label.Position            = [0.55 1.06 0];      % [x y z] – 0.55 nudges right a bit
+cb.Label.FontName            = 'Arial';
+cb.Label.FontSize            = ftsz+1;
+
+drawnow; uistack(cbHost,'top');                    % keep above other children
+
+
+% panel 'b' on the top-left mosaic axes
+[~, idxTopLeft] = min(lefts + 1e2*bottoms);  % heuristic for top-left among mosaic axes
+axTL = mosaicAxes(idxTopLeft);
+text(axTL, -0.08, 1.06, 'b', 'Units','normalized', ...
+    'FontWeight','bold', 'FontName','Arial', 'FontSize', ftsz+2);
+
+saving = ;
+if saving == 1
+    savePath = 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\figures3_chlorophyll_eof_maps';
+    print(gcf, '-dpng', '-r1200', [savePath, '.png']);
+    print(gcf, '-dpdf', '-r1200', [savePath, '.pdf']);
+end
+saving = 0;
 
 %% Supplementatl Figure Biovolume/Carbon
 % === 1. Load satellite chlorophyll ===
@@ -2644,6 +3796,510 @@ if saving == 1
 end
 saving = 0;
 
+
+%% Supplemental Figure: Fe deposition
+irondeposition.dayofyear=day(irondeposition.datetime,'dayofyear');
+
+
+%Plotting specs
+start_date = datetime(2016, 8, 1);
+end_date = datetime(2023, 11, 1);
+start_date_doy=day(start_date,'dayofyear');
+end_date_doy=day(end_date,'dayofyear');
+
+
+close all
+subplot(2,1,1)
+
+yyaxis right
+set(gca, 'YColor', 'k')  % Set left Y-axis tick and axis color to black
+% Plot PM 2.5 (right axis)
+h_pm25 = plot(sc_pm2_5_daily_slv.dayOfYear(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+              sc_pm2_5_daily_slv.pm2_5(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+              'Color', [0 0 0 0.7], 'LineStyle', '-', 'LineWidth', 1, ...
+              'DisplayName', 'PM 2.5');
+hold on;
+
+ylabel(["PM 2.5 (\mu g m ^{-3})"], 'FontSize', ftsz, 'FontName', ftname, 'Color', 'k');
+
+% Switch to left axis and plot iron sources
+yyaxis left
+set(gca, 'YColor', 'k')  % Set left Y-axis tick and axis color to black
+h1 = plot(irondeposition.dayofyear, irondeposition.TDUFEDEP,'Color','#e354d0', 'LineStyle', '-','LineWidth',2,'DisplayName','Dust');
+h2 = plot(irondeposition.dayofyear, irondeposition.TBBFEDEP,'Color','#d66a22', 'LineStyle', '-','LineWidth',2,'DisplayName','Wildfire');
+h3 = plot(irondeposition.dayofyear, irondeposition.TANFEDEP,'Color','#57a8b3', 'LineStyle', '-','LineWidth',2,'DisplayName','Anthropogenic');
+
+% Plot xlines and fill (exclude from legend)
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-', 'HandleVisibility', 'off');
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+     [0, max(ylim)*2, max(ylim)*2, 0], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.1, 'HandleVisibility', 'off');
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-', 'HandleVisibility', 'off');
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':', 'HandleVisibility', 'off');
+
+ylim([0 7e4])
+ylabel(["kg Total Fe day^{-1}"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+
+% Axis and date ticks
+xticks(start_date_doy:7:end_date_doy);
+datetick('x', 'mmm dd', 'keepticks');
+xlim([start_date_doy end_date_doy]);
+
+% Show full legend
+legend([h_pm25, h1, h2, h3], 'Location', 'northeast');
+
+% Subplot label 'a'
+% annotation('textbox', [0.08, 0.92, 0.03, 0.05], ...
+%            'String', '\bf{a}', ...
+%            'FontSize', ftsz + 6, ...
+%            'FontName', ftname, ...
+%            'LineStyle', 'none', ...
+%            'VerticalAlignment', 'bottom');
+
+
+
+subplot(2,1,2)
+
+yyaxis right
+set(gca, 'YColor', 'k')  % Set left Y-axis tick and axis color to black
+
+% Plot PM 2.5 (right axis)
+h_pm25 = plot(sc_pm2_5_daily_slv.dayOfYear(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+              sc_pm2_5_daily_slv.pm2_5(sc_pm2_5_daily_slv.datetime.Year == 2020), ...
+              'Color', [0 0 0 0.7], 'LineStyle', '-', 'LineWidth', 1, ...
+              'DisplayName', 'PM 2.5');
+hold on;
+
+ylabel(["PM 2.5 (\mu g m ^{-3})"], 'FontSize', ftsz, 'FontName', ftname, 'Color', 'k');
+
+% Switch to left axis and plot iron sources
+yyaxis left
+set(gca, 'YColor', 'k')  % Set left Y-axis tick and axis color to black
+h1 = plot(irondeposition.dayofyear, irondeposition.SDUFEDEP,'Color','#e354d0', 'LineStyle', '-','LineWidth',2,'DisplayName','Dust');
+h2 = plot(irondeposition.dayofyear, irondeposition.SBBFEDEP,'Color','#d66a22', 'LineStyle', '-','LineWidth',2,'DisplayName','Wildfire');
+h3 = plot(irondeposition.dayofyear, irondeposition.SANFEDEP,'Color','#57a8b3', 'LineStyle', '-','LineWidth',2,'DisplayName','Anthropogenic');
+
+% Plot xlines and fill (exclude from legend)
+xline(start_date_day, 'Color', 'k', 'LineWidth', 1, 'LineStyle', '-', 'HandleVisibility', 'off');
+fill([shade_start_day, shade_start_day, shade_end_day, shade_end_day], ...
+     [0, max(ylim)*2, max(ylim)*2, 0], ...
+     [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.1, 'HandleVisibility', 'off');
+xline(end_date_day, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-', 'HandleVisibility', 'off');
+xline(lag_date_day, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':', 'HandleVisibility', 'off');
+
+ylim([0 700])
+ylabel(["kg Soluble Fe day^{-1}"], 'FontSize', ftsz, 'FontName', ftname, 'FontWeight', 'bold');
+
+% Axis and date ticks
+xticks(start_date_doy:7:end_date_doy);
+datetick('x', 'mmm dd', 'keepticks');
+xlim([start_date_doy end_date_doy]);
+
+% Show full legend
+legend([h_pm25, h1, h2, h3], 'Location', 'northeast');
+
+% Subplot label 'a'
+% annotation('textbox', [0.08, 0.42, 0.03, 0.05], ...
+%            'String', '\bf{b}', ...
+%            'FontSize', ftsz + 6, ...
+%            'FontName', ftname, ...
+%            'LineStyle', 'none', ...
+%            'VerticalAlignment', 'bottom');
+
+
+
+% Set figure size for publication
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 4]);  
+set(gcf, 'PaperPositionMode', 'auto');
+
+% === 10. Save ===
+saving = 1;
+if saving == 1
+    savePath = 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\Fedeposition';
+    print(gcf, '-dpng', '-r1200', [savePath, '.png']);
+    print(gcf, '-dpdf', '-r1200', [savePath, '.pdf']);
+end
+saving = 0;
+
+
+%% Supplemental Figure. Tempertaure comparison complete time series
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat')
+
+T = physical_forcings_biology_table;  % timetable with datetime, sst, sea_water_temperature, temperature
+
+ftsz = 8;
+ftname = 'Helvetica';
+lw = 1.2;
+
+col_sst = [0.95 0.20 0.80];      % pink
+col_sea = [0.64 0.08 0.18];      % red
+col_tmp = [0.93 0.69 0.13];      % yellow
+alphaLine = 0.35;                % reduced opacity for bottom panel
+
+% Time zone safety
+tz = T.datetime.TimeZone;
+if isempty(tz)
+    dt2020_start = datetime(2020,1,1);
+    dt2020_end   = datetime(2020,12,31,23,59,59);
+else
+    dt2020_start = datetime(2020,1,1,'TimeZone',tz);
+    dt2020_end   = datetime(2020,12,31,23,59,59,'TimeZone',tz);
+end
+
+% 2020 subset (daily)
+TT_2020 = T(timerange(dt2020_start, dt2020_end), {'sst','sea_water_temperature','temperature'});
+
+% Weekly median for full record
+TTw = retime(T, 'weekly', 'median');
+TTw.weekofyear = week(TTw.datetime, "weekofyear");
+TTw.temp_diff = TTw.sst - TTw.sea_water_temperature;
+
+% Climatology mean ± SE by week-of-year
+weeks = (1:53)';
+Mean = nan(53,1); SE = nan(53,1);
+wk = TTw.weekofyear;
+x = TTw.temp_diff;
+for k = 1:53
+    v = x(wk==k);
+    v = v(~isnan(v));
+    if ~isempty(v)
+        Mean(k) = mean(v);
+        if numel(v) > 1
+            SE(k) = std(v) / sqrt(numel(v));
+        end
+    end
+end
+mean_smooth = movmean(Mean, 1, 'omitnan');
+se_smooth   = abs(movmean(SE, 1, 'omitnan'));
+ciU = mean_smooth + 1.96*se_smooth;
+ciL = mean_smooth - 1.96*se_smooth;
+valid = ~isnan(mean_smooth) & ~isnan(ciU) & ~isnan(ciL);
+wks_v = weeks(valid); mean_v = mean_smooth(valid); ciU_v = ciU(valid); ciL_v = ciL(valid);
+
+% Figure: 2x2, bottom tile spans both columns
+fig = figure('Units','inches','Position',[0 0 5 6],'Color','w');
+tlo = tiledlayout(fig, 2, 2, 'TileSpacing','compact','Padding','compact');
+
+% Panel 1 (top-left): 2020 daily temps
+ax1 = nexttile(tlo, 1);
+hold(ax1,'on');
+plot(ax1, TT_2020.datetime, TT_2020.sst,                  'Color', col_sst, 'LineWidth', lw);
+plot(ax1, TT_2020.datetime, TT_2020.sea_water_temperature,'Color', col_sea, 'LineWidth', lw);
+plot(ax1, TT_2020.datetime, TT_2020.temperature,          'Color', col_tmp, 'LineWidth', lw);
+xlabel(ax1,''); ylabel(ax1,'Temperature (°C)');
+set(ax1,'FontSize',ftsz,'FontName',ftname,'Box','on'); grid(ax1,'on');
+if isempty(tz)
+    months_2020 = datetime(2020,1:12,1);
+else
+    months_2020 = datetime(2020,1:12,1,'TimeZone',tz);
+end
+set(ax1,'XTick', months_2020, 'XTickLabel', cellstr(datestr(months_2020,'mmm')));
+legend(ax1, {'Satellite SST','MLML (16 m)','SCMW'}, ...
+    'FontSize',ftsz,'Location','southoutside','Orientation','horizontal','Box','off');
+
+% Panel 2 (top-right): weekly temp diff climatology ±95% CI vs 2020
+ax2 = nexttile(tlo, 2);
+hold(ax2,'on');
+fill(ax2, [wks_v; flipud(wks_v)], [ciU_v; flipud(ciL_v)], [0.59 0.61 0.65], ...
+     'FaceAlpha',0.15,'EdgeColor','none','HandleVisibility','off');
+plot(ax2, wks_v, mean_v, '-', 'LineWidth', 1, 'Color', [0.59 0.61 0.65]);
+is2020w = year(TTw.datetime)==2020;
+plot(ax2, TTw.weekofyear(is2020w), TTw.temp_diff(is2020w), 'LineWidth', lw);
+yline(ax2,0,'k--','LineWidth',0.75);
+xlabel(ax2,''); ylabel(ax2,'SST - MLML (°C)');
+set(ax2,'FontSize',ftsz,'FontName',ftname,'Box','on'); grid(ax2,'on');
+set(ax2,'XTick',[1 5 9 14 18 23 27 31 36 40 45 49], ...
+         'XTickLabel',{'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'});
+xlim(ax2, [min(wks_v) max(wks_v)]);
+legend(ax2, {'Climatology','2020'}, ...
+    'FontSize',ftsz,'Location','southoutside','Orientation','horizontal','Box','off');
+
+% Panel 3 (bottom row spanning both columns): full record (no legend)
+ax3 = nexttile(tlo, [1 2]);
+hold(ax3,'on');
+h1 = plot(ax3, T.datetime, T.sst,                  'LineWidth', lw);
+h2 = plot(ax3, T.datetime, T.sea_water_temperature,'LineWidth', lw);
+h3 = plot(ax3, T.datetime, T.temperature,          'LineWidth', lw);
+try
+    set(h1,'Color',[col_sst alphaLine]);
+    set(h2,'Color',[col_sea alphaLine]);
+    set(h3,'Color',[col_tmp alphaLine]);
+catch
+    set(h1,'Color',0.4*col_sst + 0.6*[1 1 1]);
+    set(h2,'Color',0.4*col_sea + 0.6*[1 1 1]);
+    set(h3,'Color',0.4*col_tmp + 0.6*[1 1 1]);
+end
+xlabel(ax3,'Year'); ylabel(ax3,'Temperature (°C)');
+set(ax3,'FontSize',ftsz,'FontName',ftname,'Box','on'); grid(ax3,'on');
+
+% Year ticks (time-zone safe)
+yrs = year(T.datetime(1)):year(T.datetime(end));
+if isempty(tz)
+    yearTicks = datetime(yrs,1,1);
+else
+    yearTicks = datetime(yrs,1,1,'TimeZone',tz);
+end
+set(ax3,'XTick',yearTicks); xtickformat(ax3,'yyyy');
+
+% ---- Correlations (pairwise; exclude NaNs) ----
+r_sst_scmw = corr(T.sst(:),        T.temperature(:),           'Rows','pairwise','Type','Pearson');
+r_sst_mlml = corr(T.sst(:),        T.sea_water_temperature(:), 'Rows','pairwise','Type','Pearson');
+r_scmw_mlml= corr(T.temperature(:),T.sea_water_temperature(:), 'Rows','pairwise','Type','Pearson');
+
+% Add text in upper-right corner of the axes
+txt = sprintf(['Satellite SST vs. SCMW:  R = %.2f\n' ...
+               'Satellite SST vs. MLML: R = %.2f\n' ...
+               'SCMW vs. MLML:          R = %.2f'], ...
+               r_sst_scmw, r_sst_mlml, r_scmw_mlml);
+
+xl = xlim(ax3); yl = ylim(ax3);
+text(ax3, xl(2), yl(2), txt, ...
+    'HorizontalAlignment','right','VerticalAlignment','top', ...
+    'FontSize', ftsz, 'BackgroundColor','none', 'EdgeColor','none');
+
+% Add panel letter to upper-right outside corner
+text(ax1, 0, 1.02, 'a', 'Units', 'normalized', ...
+    'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
+    'FontSize', ftsz, 'FontWeight', 'bold', 'FontName', ftname);
+
+text(ax2, 0, 1.02, 'b', 'Units', 'normalized', ...
+    'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
+    'FontSize', ftsz, 'FontWeight', 'bold', 'FontName', ftname);
+
+text(ax3, 0, 1.02, 'c', 'Units', 'normalized', ...
+    'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom', ...
+    'FontSize', ftsz, 'FontWeight', 'bold', 'FontName', ftname);
+
+% Optional: Save the figure with high resolution for publication
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\temp_timeseries_compare.png'); 
+    print(gcf, '-dpdf', '-r1200', ...
+        'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\supplemental\temp_timeseries_compare.pdf'); 
+end
+
+%% Supplemental: Correlation between satellite and in situ chlorophyll (Reviewer Comment)
+tbl = readtable('chlorophyll_for_satellite_check_2020_fire.xlsx');
+
+
+% Robustly grab columns (expects: Date, chlorophyll_GFF, Mean)
+assert(all(ismember({'Date','chlorophyll_GFF','Mean'}, tbl.Properties.VariableNames)), ...
+    'Expected columns not found: Date, chlorophyll_GFF, Mean');
+
+% Convert Date to datetime if needed
+if ~isdatetime(tbl.Date)
+    try
+        tbl.Date = datetime(tbl.Date);       % auto-detect
+    catch
+        % fallback: common formats
+        tbl.Date = datetime(tbl.Date, 'InputFormat','yyyy-MM-dd');
+    end
+end
+
+% Remove rows with NaNs in either series
+good = ~isnan(tbl.Mean) & ~isnan(tbl.chlorophyll_GFF);
+x = tbl.chlorophyll_GFF(good);
+y = tbl.Mean(good);
+
+d = tbl.Date(good);
+
+% Figure
+ftsz = 8; ftname = 'Helvetica';
+figure('Units','inches','Position',[0 0 4.2 3.8],'Color','w'); hold on; grid on; box on;
+
+% Scatter
+scatter(x, y, 30, [0.20 0.45 0.70], 'filled', 'MarkerFaceAlpha', 0.8);
+
+% 1:1 line
+xymin = min([x; y], [], 'omitnan');
+xymax = max([x; y], [], 'omitnan');
+pad   = 0.05*(xymax - xymin);
+xlim([xymin - pad, xymax + pad]);
+ylim([xymin - pad, xymax + pad]);
+plot([xymin - pad, xymax + pad], [xymin - pad, xymax + pad], 'k--', 'LineWidth', 1);
+
+% Point labels = Date
+% Choose a compact format to avoid overlap; tweak if you prefer full dates
+dateLabels = cellstr(datestr(d, 'mm/dd'));  % or 'yyyy-mm-dd'
+for i = 1:numel(x)
+    text(x(i), y(i), [' ' dateLabels{i}], ...
+        'HorizontalAlignment','right', 'VerticalAlignment','bottom','Rotation', 45, ...
+        'FontSize', ftsz, 'FontName', ftname, 'Color', [0 0 0], 'Clipping','on');
+end
+
+% Axes labels
+ylabel('Satellite Chlorophyll-a (mg m^{-3})', 'FontSize', ftsz, 'FontName', ftname);
+xlabel('CalHABMAP Chlorophyll-a (mg m^{-3})', 'FontSize', ftsz, 'FontName', ftname);
+set(gca, 'FontSize', ftsz, 'FontName', ftname);
+
+
+% Save the figure if required
+saving = 0;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_1_v0.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_1_v0.pdf');
+end
+saving = 0;
+
+%% 
+% Assumes you already defined: years, base_path, subsetMask (from your lat/lon grid)
+% Produces a plot of datetime vs # of pixels == 255 (within subsetMask)
+base_path = 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl\';
+
+% Define the range of years
+years = 2020;
+
+% Coordinate calculations
+maxX = 307; % Maximum x index for chlorophyll data
+maxY = 318; % Maximum y index for chlorophyll data
+
+[x, y] = meshgrid(0:maxX, 0:maxY);
+lon = -122.68085 + 0.003290 * x;
+lat = 37.180664 - 0.002701 * y;
+
+% Define bounds for subsetting (example bounds, adjust as needed)
+latBounds = [36.3219, 37.180664]; % latitude range
+lonBounds = [-122.68085, -121.6675]; % longitude range
+
+subsetMask = (lat >= latBounds(1) & lat <= latBounds(2)) & ...
+             (lon >= lonBounds(1) & lon <= lonBounds(2));
+
+% === Inputs expected in workspace ===
+% base_path  -> e.g., 'Q:\Dante\data\MB_Wildfire_Obs\satellite_chl\'
+% subsetMask -> logical array matching the lat/lon grid you built
+
+assert(exist('base_path','var')==1, 'Define base_path first.');
+assert(exist('subsetMask','var')==1, 'Define subsetMask first.');
+
+years_all   = 2008:2023;
+year_target = 2020;
+clim_years  = years_all(years_all ~= year_target);
+
+% Style
+ftsz = 9; ftname = 'Helvetica'; lw = 1.3;
+
+% Preallocate holders
+Y2020 = nan(366,1);                    % 2020 DOY vector
+Ymat  = nan(366, numel(clim_years));   % climatology columns
+colIdx = 1;
+
+for yr = years_all
+    % Collect (date, count==255) across all subfolders for this year
+    dates_tmp  = datetime.empty(0,1);
+    counts_tmp = [];
+
+    subfolders = dir(fullfile(base_path, num2str(yr), 'C*chl_day*'));
+    for s = 1:numel(subfolders)
+        files = dir(fullfile(subfolders(s).folder, subfolders(s).name, '*.hdf'));
+        if isempty(files), continue; end
+
+        % Parse each file date: prefer yyyyDDD, else yyyyMMdd, else file timestamp
+        fnames = {files.name};
+        fdates = NaT(numel(files),1);
+        for i = 1:numel(files)
+            fn = fnames{i};
+            tok7 = regexp(fn, '\d{7}', 'match');   % yyyyDDD
+            tok8 = regexp(fn, '\d{8}', 'match');   % yyyyMMdd
+            t = NaT;
+            if ~isempty(tok7)
+                for k = 1:numel(tok7)
+                    try, t = datetime(tok7{k}, 'InputFormat','yyyyDDD'); break; end %#ok<TRYNC>
+                end
+            end
+            if isnat(t) && ~isempty(tok8)
+                for k = 1:numel(tok8)
+                    try, t = datetime(tok8{k}, 'InputFormat','yyyyMMdd'); break; end %#ok<TRYNC>
+                end
+            end
+            if isnat(t)
+                t = datetime(files(i).datenum, 'ConvertFrom','datenum');
+            end
+            fdates(i) = t;
+        end
+
+        [fdates, ord] = sort(fdates);
+        files = files(ord);
+
+        % Read each file, fix signed byte, count ==255 in subset
+        for f = 1:numel(files)
+            fullFilePath = fullfile(files(f).folder, files(f).name);
+            info = hdfinfo(fullFilePath);
+            ds   = info.SDS(1).Name;
+            raw  = hdfread(fullFilePath, ds);  % typically int8
+            raw  = int16(raw);
+            raw(raw < 0) = raw(raw < 0) + 256; % now 0..255
+
+            thisCount = sum(raw(subsetMask) == 255, 'all');
+
+            dates_tmp(end+1,1)  = fdates(f); %#ok<AGROW>
+            counts_tmp(end+1,1) = thisCount; %#ok<AGROW>
+        end
+    end
+
+    % Reduce to DOY series (mean if multiple files per day)
+    vec = nan(366,1);
+    if ~isempty(dates_tmp)
+        good   = ~isnat(dates_tmp) & ~isnan(counts_tmp);
+        doy    = day(dates_tmp(good), 'dayofyear');
+        vals   = counts_tmp(good);
+        % accumarray with mean per DOY (NaN default)
+        tmp = accumarray(doy, vals, [366 1], @mean, NaN);
+        vec(:) = tmp;
+    end
+
+    if yr == year_target
+        vec(isnan(vec)) = 0;  % missing days -> 0 for 2020
+        Y2020 = vec;
+    else
+        Ymat(:, colIdx) = vec; % keep NaNs for climatology stats
+        colIdx = colIdx + 1;
+    end
+end
+
+% Climatology (other years): mean ± 95% CI by DOY (omit NaNs)
+mu   = mean(Ymat, 2, 'omitnan');
+N    = sum(~isnan(Ymat), 2);
+sd   = std(Ymat, 0, 2, 'omitnan');
+se   = sd ./ max(N,1);
+ci95 = 1.96 * se;
+lo   = mu - ci95;
+hi   = mu + ci95;
+
+% ---- Plot (DOY on x) ----
+DAYS = (1:366).';
+
+figure('Units','inches','Position',[0 0 5 3],'Color','w'); hold on; box on; grid on;
+
+% 95% CI shading (gray)
+fill([DAYS; flipud(DAYS)], [hi; flipud(lo)], [0.59 0.61 0.65], ...
+     'FaceAlpha',0.18, 'EdgeColor','none', 'HandleVisibility','off');
+
+% Climatology mean
+plot(DAYS, mu, '-', 'Color', [0.59 0.61 0.65], 'LineWidth', 1.2, ...
+     'DisplayName','Climatology mean (others)');
+
+% 2020 series (line + dots)
+plot(DAYS, Y2020, '-', 'Color', [0.10 0.45 0.82], 'LineWidth', 1.4, 'DisplayName','2020');
+scatter(DAYS, Y2020, 10, [0.10 0.45 0.82], 'filled', 'HandleVisibility','off');
+
+xlim([1 366]);
+xlabel('Day of Year', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('# pixels == 255', 'FontSize', ftsz, 'FontName', ftname);
+set(gca,'FontSize', ftsz, 'FontName', ftname, 'TickDir','out');
+
+legend('Location','northwest','Box','off');
+
+% Optional save
+saving = 0;
+if saving == 1
+    outdir = fullfile(pwd, 'qc_plots');
+    if ~exist(outdir,'dir'), mkdir(outdir); end
+    print(gcf, '-dpng', '-r1200', fullfile(outdir, 'pixels255_doy_2020_vs_climatology.png'));
+    print(gcf, '-dpdf', '-r1200', fullfile(outdir, 'pixels255_doy_2020_vs_climatology.pdf'));
+end
+
+
 %% ========= Functions ========= 
 
 %% Function to parse the filename and determine the year and month
@@ -2694,3 +4350,4 @@ function [dateStr] = parseFilenameDay(filename)
     % Format the date string as 'Month, Day Year'
     dateStr = datestr(dateNum, 'mmmm, dd yyyy');
 end
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 �

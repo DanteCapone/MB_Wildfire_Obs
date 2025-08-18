@@ -6,13 +6,13 @@ Capone et al. (in review). Extreme wildfire conditions shift coastal phytoplankt
 
 The project investigates how the 2020 California Lightning Complex Fires influenced phytoplankton communities in Monterey Bay using a combination of satellite, in situ, and Imaging FlowCytobot (IFCB) time-series data.
 
-├── data/                     # Raw input datasets (e.g., IFCB, satellite, shore station, aerosols)
+- data/                     # Raw input datasets (e.g., IFCB, satellite, shore station, aerosols)
 
-├── processed_data/            # Processed datasets generated for analysis
+- processed_data/            # Processed datasets generated for analysis
 
-├── scripts/                   # Analysis and figure generation scripts (MATLAB & R)
+- scripts/                   # Analysis and figure generation scripts (MATLAB & R)
 
-├── Monterey-Bay-Wildfires-Shift/ # Manuscript text, figures, and supporting information
+- Monterey-Bay-Wildfires-Shift/ # Manuscript text, figures, and supporting information
 
 ### Requirements
 - **MATLAB R2023b–2024a**  

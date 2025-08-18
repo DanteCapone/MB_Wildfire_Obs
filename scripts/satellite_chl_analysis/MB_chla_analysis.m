@@ -26,7 +26,7 @@ results.years=years;
 
 %Save
 save('satellite_chl_MB_5day_climatology_daily_data.mat','satellite_chl_MB_5day_climatology_daily_data')
-%% 
+
 
 %% Plot climatologies
 % Now plot the output in a figure with two subplots

@@ -9,3 +9,7 @@ Dante.Rproj
 .Rhistory
 .RData
 
+scripts/aerosol_analysis/
+scripts/unused/
+scripts/ancillary_analysis/
+scripts/glider_analysis/

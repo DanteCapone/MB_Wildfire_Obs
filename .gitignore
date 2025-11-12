@@ -13,3 +13,5 @@ scripts/aerosol_analysis/
 scripts/unused/
 scripts/ancillary_analysis/
 scripts/glider_analysis/
+scripts/main_analysis/
+scripts/main_analysis/compare/

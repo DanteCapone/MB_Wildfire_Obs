@@ -777,7 +777,7 @@ ftsz = 8;
 ftname = 'Helvetica';
 linewdt = 1.5;
 ptsz = 25;
-tiledfigure = figure('Units', 'inches', 'Position', [0, 0, 5, 4.5]);
+tiledfigure = figure('Units', 'inches', 'Position', [0, 0, 5, 5]);
 t = tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
 
 
@@ -787,7 +787,7 @@ legend_labels = {
     'Centric'
     '\it{Chaetoceros}'
     '{Cyl Nitz}'
-    '{Det }, {Cer }, {Lau }'
+    '{Det}, {Cer}, {Lau}'
     '\it{Entomoneis}'
     '{Guin } {Dact}'
     '\it{Hemiaulus}'
@@ -891,9 +891,9 @@ end
 legend([scatter_handles_clusters; scatter_handles_criteria], [legend_labels_clusters, legend_labels_criteria], ...
        'Location', 'bestoutside', 'FontSize', ftsz, 'FontName', ftname);
 
-xlabel('NMDS Dimension 1', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
-ylabel('NMDS Dimension 2', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
-title('a', 'FontWeight', 'bold', 'FontSize', ftsz + 6, 'Units', 'normalized', 'Position', [0.05 1.05], 'HorizontalAlignment', 'left');
+xlabel('NMDS 1', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('NMDS 2', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+title('a', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [0.03 1.03], 'HorizontalAlignment', 'left');
 
 % Panel B: June 2018
 nexttile
@@ -909,7 +909,7 @@ for k = 1:length(hBar)
 end
 
 ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
-title('b', 'FontWeight', 'bold', 'FontSize', ftsz + 6, 'Units', 'normalized', 'Position', [0.0 1.05], 'HorizontalAlignment', 'left');
+title('b', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [0.0 1.03], 'HorizontalAlignment', 'left');
 
 % Set x-axis with ticks every seven days
 ax = gca;
@@ -940,7 +940,7 @@ for k = 1:length(hBar)
     hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
 end
 ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
-title('c', 'FontWeight', 'bold', 'FontSize', ftsz + 6, 'Units', 'normalized', 'Position', [0.0 1.05], 'HorizontalAlignment', 'left');
+title('c', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [-0.05 1.03], 'HorizontalAlignment', 'left');
 
 % Set x-axis with ticks every seven days
 ax = gca;
@@ -958,7 +958,6 @@ text(mean(xl), yl(1) + 0.8 * range(yl), ["April"+newline+"2020"], ...
 
 
 % Get position of Panel C axes
-ax = gca;
 ax_pos = ax.Position;
 
 % Create the legend
@@ -980,10 +979,19 @@ lgd.Position(2) = ax_pos(2);           % Align bottom
 lgd.Position(4) = ax_pos(4);           % Match height of Panel C
 lgd.Position(1) = ax_pos(1) + ax_pos(3) + offset;  % Slightly to the right of Panel C
 
+% Adjust legend box position to avoid cutoff
+lgd.Position(3) = lgd.Position(3) - 0.05;  % increase width slightly to avoid right cutoff
+
 % Adjust legend width for right padding
 right_padding = 0.02;  % extra width to avoid clipping
 
 lgd.Position(3) = lgd.Position(3) + right_padding;
+% Optional: shift left slightly so expansion goes both ways
+lgd.Position(1) = lgd.Position(1) - right_padding / 2;
+
+
+lgd.ItemTokenSize = [8, 10];  % [width, height] in points
+
 
 % Apply consistent font styling
 allAxes = findall(tiledfigure, 'Type', 'axes');
@@ -991,6 +999,27 @@ for i = 1:length(allAxes)
     allAxes(i).FontSize = ftsz;
     allAxes(i).FontName = ftname;
 end
+
+lgd.ItemTokenSize = [8, 10];  % [width, height] in points
+
+set(gcf, 'PaperPositionMode', 'auto');
+
+saving=1;
+if saving==1
+    % % ---- Save as TIFF (1200 DPI) ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.tiff', 'Resolution', 1200);
+    % 
+    % % ---- Save as PDF using exportgraphics ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.pdf', ...
+    %     'ContentType', 'image', 'Resolution', 1200);
+    % 
+    % % ---- Save as PNG using exportgraphics ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.png', ...
+    %     'Resolution', 1200);
+    print(gcf, '-dpng', '-r1200',  'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.png');
+    print(gcf, '-dpdf', '-r1200',  'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.pdf');
+end
+
 
 %%
 % ----- Stitch All 3 Panels Vertically -----

@@ -1,0 +1,1227 @@
+%%NMDS Similar Events Plot
+
+% Load the dataset
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat');
+
+
+% Step 1: Extract the 'datetime' column to use for filtering
+datetime_values = ifcbbray.datetime; % Assuming 'datetime' is a datetime column
+
+% Step 2: Extract taxa counts from columns 2 to 52
+taxa_counts = ifcbbray{:, 2:52}; % Community composition data (taxa counts)
+
+% Step 3: Identify samples that have another sample exactly 6 days apart
+valid_indices = false(size(datetime_values)); % Preallocate a logical array
+
+for i = 1:length(datetime_values)
+
+    % Look for another sample exactly 6 days before or after
+    match_before = find(datetime_values == datetime_values(i) - days(6), 1);
+    match_after = find(datetime_values == datetime_values(i) + days(6), 1);
+    
+    if ~isempty(match_before) || ~isempty(match_after)
+        valid_indices(i) = true; % Mark this sample as valid if it has a match
+    end
+end
+
+% Step 4: Filter the taxa counts and datetime values based on valid indices
+filtered_taxa_counts = taxa_counts(valid_indices, :);
+filtered_datetime_values = datetime_values(valid_indices);
+
+% Step 5: Compute Bray-Curtis dissimilarity on the filtered data
+function D = braycurtis_batch(X)
+    n = size(X, 1); % Number of samples
+    D = zeros(n*(n-1)/2, 1); % Preallocate distance matrix in pdist format
+    k = 1;
+    for i = 1:n-1
+        for j = i+1:n
+            numerator = sum(abs(X(i,:) - X(j,:)));
+            denominator = sum(X(i,:) + X(j,:));
+            D(k) = numerator / denominator;
+            k = k + 1;
+        end
+    end
+end
+
+bray_dist = braycurtis_batch(filtered_taxa_counts);
+
+% Step 6: Perform NMDS using 'mdscale' on Bray-Curtis dissimilarities
+nmds_dim = 3; % For 2D NMDS
+
+% Convert the condensed distance vector into a full distance matrix
+square_brays_dist = squareform(bray_dist); % Converts vector to square matrix
+
+% Perform NMDS
+[nmds_coords, stress] = mdscale(square_brays_dist, nmds_dim, 'Criterion', 'stress');
+
+
+
+%% Now generate colors only for valid month-years
+colors_month_year = [
+    0.57, 0.44, 0.86;   % Soft lavender for light contrast
+    0.39, 0.76, 0.65;   % Aqua-green for soft contrast
+    0.00, 0.00, 0.00;   % Black (original)
+    0.70, 0.11, 0.11;   % Dark red for strong contrast  
+    0.85, 0.33, 0.10;   % Dark orange for warm contrast
+    0.18, 0.33, 0.66;   % Blue with medium contrast
+    0.31, 0.50, 0.74;   % Muted blue for a neutral contrast
+    0.13, 0.55, 0.49;   % Soft but dark blue-green (original)
+    0.79, 0.18, 0.57;   % Magenta (original)
+    0.98, 0.68, 0.13;   % Orange-gold for high contrast
+
+    
+];
+
+% Plot the NMDS results and color by cluster
+close all
+% Define updated date range for labeling points of interest
+label_start_date = datetime(2020, 8, 25);
+label_end_date = datetime(2020, 8, 29);
+
+% Define 30-day buffer period
+buffer_start_date = label_start_date - days(30);
+buffer_end_date = label_end_date + days(30);
+
+% Calculate all pairwise distances in NMDS space
+pairwise_distances = pdist(nmds_coords);
+
+% Choose a proximity threshold based on a percentile, e.g., 20th percentile
+proximity_threshold = prctile(pairwise_distances, 20); % 20th percentile
+
+% Step 1: Identify points in the given date range and 30-day buffer
+labeled_indices = find(filtered_datetime_values >= label_start_date & filtered_datetime_values <= label_end_date);
+buffer_indices = find(filtered_datetime_values >= buffer_start_date & filtered_datetime_values <= buffer_end_date);
+
+% Step 2: Perform k-means clustering
+optimal_clusters = 4; % Number of clusters from elbow method
+[cluster_labels, cluster_centers] = kmeans(nmds_coords, optimal_clusters, 'Replicates', 10, 'Distance', 'sqeuclidean');
+
+% Step 3: Plot NMDS points - color all points by cluster using consistent colors
+figure;
+all_indices = 1:length(filtered_datetime_values);
+colors_cluster = [
+    0.98, 0.68, 0.13;   % Orange-gold
+    0.79, 0.18, 0.57;   % Magenta
+    0.13, 0.55, 0.49;   % Soft but dark green
+    0.31, 0.50, 0.74    % Muted blue
+    0.18, 0.33, 0.66;   % Medium blue
+    0.85, 0.33, 0.10;   % Dark orange
+    0.57, 0.44, 0.86;   % Lavender
+    0.39, 0.76, 0.65;   % Aqua-green
+    0.70, 0.11, 0.11;   % Dark red
+    
+];
+
+ptsz=25;
+ftsz=10;
+% Adjust this palette depending on the number of clusters
+colors_cluster = colors_cluster(1:optimal_clusters, :);
+% Plot all points colored by cluster using consistent cluster colors
+scatter_handles_clusters = gscatter(nmds_coords(:, 1), nmds_coords(:, 2), cluster_labels, colors_cluster, '.', ptsz-10);
+hold on;
+
+% Step 4: Identify proximal dates outside the buffer period
+outside_buffer_indices = setdiff(all_indices, buffer_indices); % Exclude buffer points
+
+% Find proximal points (within proximity to labeled dates)
+proximal_indices = [];
+for i = 1:length(outside_buffer_indices)
+    distances_to_labeled = pdist2(nmds_coords(outside_buffer_indices(i), :), nmds_coords(labeled_indices, :));
+    if min(distances_to_labeled) < proximity_threshold
+        proximal_indices = [proximal_indices, outside_buffer_indices(i)];
+    end
+end
+
+% Step 5: Extract the month-year from the dates for the criteria meeting points
+month_year_labels = cellstr(datestr(filtered_datetime_values, 'mmm-yyyy')); % Extract month-year in 'MMM-YYYY' format
+
+% Initialize separate handles and labels for the clusters and month-year
+scatter_handles_criteria = [];
+legend_labels_clusters = cell(1, optimal_clusters); % For clusters
+legend_labels_criteria = {}; % For month-year points
+used_colors = zeros(0, 3); % Track used colors for legend creation
+used_month_years = {}; % Track used month-years to avoid duplicates in legend
+valid_month_years = {}; % Track month-years that meet criteria
+
+% Add cluster labels to the legend
+for k = 1:optimal_clusters
+    legend_labels_clusters{k} = ['Cluster ', num2str(k)];
+end
+
+% Step 6: Identify valid month-years that meet the criteria
+for i = 1:length(filtered_datetime_values) - 7 + 1
+    % Extract 7 days of data
+    date_window = filtered_datetime_values(i:i + 7 - 1);
+    cluster_window = cluster_labels(i:i + 7 - 1);
+    
+    % Skip the window if there is a gap of more than 7 days
+    if max(diff(date_window)) > days(7)
+        continue; % Skip this window due to large gap
+    end
+    
+    % Check if 4 or more days are in the same cluster
+    most_common_cluster = mode(cluster_window);
+    count_in_cluster = sum(cluster_window == most_common_cluster);
+    
+    % If 4 or more days are in the same cluster
+    if count_in_cluster >= 4
+        % Find the points in this window that belong to the most common cluster
+        cluster_indices_in_window = find(cluster_window == most_common_cluster);
+        date_indices_in_cluster = i + cluster_indices_in_window - 1; % Convert to global indices
+        
+        % Check if these points meet the proximity condition
+        distances_to_labeled_cluster_points = pdist2(nmds_coords(date_indices_in_cluster, :), nmds_coords(labeled_indices, :));
+        min_distances = min(distances_to_labeled_cluster_points, [], 2);
+        
+        % If 4 or more points in the cluster meet the proximity threshold
+        if sum(min_distances < proximity_threshold) >= 4
+            % Add the month-year of these points to the list of valid month-years
+            month_year_label = month_year_labels{date_indices_in_cluster(1)}; % Get the month-year of the first point
+            if ~ismember(month_year_label, valid_month_years)
+                valid_month_years{end+1} = month_year_label; % Add the month-year to the valid list
+            end
+        end
+    end
+end
+
+% Now generate colors only for valid month-years
+num_valid_month_years = length(valid_month_years);
+
+
+
+
+% Step 7: Plot and color only criteria meeting points by month-year
+for i = 1:length(filtered_datetime_values) - 7 + 1
+    % Extract 7 days of data
+    date_window = filtered_datetime_values(i:i + 7 - 1);
+    cluster_window = cluster_labels(i:i + 7 - 1);
+    
+    % Skip the window if there is a gap of more than 7 days
+    if max(diff(date_window)) > days(7)
+        continue; % Skip this window due to large gap
+    end
+    
+    % Check if 4 or more days are in the same cluster
+    most_common_cluster = mode(cluster_window);
+    count_in_cluster = sum(cluster_window == most_common_cluster);
+    
+    % If 4 or more days are in the same cluster
+    if count_in_cluster >= 4
+        % Find the points in this window that belong to the most common cluster
+        cluster_indices_in_window = find(cluster_window == most_common_cluster);
+        date_indices_in_cluster = i + cluster_indices_in_window - 1; % Convert to global indices
+        
+        % Check if these points meet the proximity condition
+        distances_to_labeled_cluster_points = pdist2(nmds_coords(date_indices_in_cluster, :), nmds_coords(labeled_indices, :));
+        min_distances = min(distances_to_labeled_cluster_points, [], 2);
+        
+        % If 4 or more points in the cluster meet the proximity threshold
+        if sum(min_distances < proximity_threshold) >= 4
+            % Assign the color based on the month-year of the criteria meeting points
+            month_year_label = month_year_labels{date_indices_in_cluster(1)}; % Get the month-year of the first point in the cluster
+            month_year_idx = find(strcmp(valid_month_years, month_year_label)); % Find the corresponding index for color
+            
+            % Only create a scatter handle for the first occurrence of a new month-year
+            if ~ismember(month_year_label, used_month_years)
+                % Color the first criteria meeting points by their month-year and add to the legend
+                
+                scatter_handle = scatter(nmds_coords(date_indices_in_cluster(1), 1), nmds_coords(date_indices_in_cluster(1), 2), ...
+                                         ptsz, colors_month_year(month_year_idx, :),'filled' ,'diamond');
+                scatter_handles_criteria = [scatter_handles_criteria, scatter_handle];
+                
+                % Add the legend entry for the first occurrence
+                legend_labels_criteria{end+1} = month_year_label; % Add month-year to the legend
+                used_month_years{end+1} = month_year_label; % Track the used month-year
+            end
+            
+            % Plot the rest of the points for this month-year without adding to the legend
+            for j = 2:length(date_indices_in_cluster)
+                date_idx = date_indices_in_cluster(j);
+                
+                % Color the subsequent criteria meeting points by their month-year
+                scatter(nmds_coords(date_idx, 1), nmds_coords(date_idx, 2), ptsz, colors_month_year(month_year_idx, :),'filled','diamond');
+            end
+        end
+    end
+end
+
+% % Step 9: Draw ellipses around clusters using proper cluster colors
+% for i = 1:optimal_clusters
+%     % Get the coordinates for points in the current cluster
+%     cluster_points = nmds_coords(cluster_labels == i, :);
+% 
+%     % Plot an ellipse around the cluster points using the cluster color
+%     plot_ellipse(cluster_points(:, 1), cluster_points(:, 2), cluster_centers(i, :), colors_cluster(i, :)); % Use cluster color for ellipse
+% end
+
+% Step 10: Manually add legend for clusters and month-year points
+full_legend_labels = [legend_labels_clusters, legend_labels_criteria]; % Combine cluster and month-year labels
+scatter_handles = [scatter_handles_clusters', scatter_handles_criteria]; % Combine handles for clusters and month-year points
+
+% Create legend explicitly and keep AutoUpdate off
+legend(scatter_handles, full_legend_labels, 'Location', 'bestoutside', 'FontSize', ftsz, 'AutoUpdate', 'off');
+
+% Adjust axes properties for publication-quality output
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for plot elements
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Round axis limits to nearest 0.1
+xlim_rounded = round(ax.XLim * 10) / 10;
+ylim_rounded = round(ax.YLim * 10) / 10;
+
+% Create tick vectors at 0.1 intervals (adjust spacing if too dense)
+ax.XTick = xlim_rounded(1):0.1:xlim_rounded(2);
+ax.YTick = ylim_rounded(1):0.1:ylim_rounded(2);
+
+% Adjust figure size for double-column width and aspect ratio (L&O specs)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 5, 2]);  % Set size for L&O double-column
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Add title and labels
+% Make axis labels bold
+xlabel('NMDS Dimension 1', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('NMDS Dimension 2', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add panel label 'a' to top-left outside the axes
+text(ax.Position(1) - 0.12, ax.Position(2) + ax.Position(4) + 0.08, 'a', ...
+     'Units', 'normalized', 'FontWeight', 'bold', 'FontSize', ftsz + 2, ...
+     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\ifcb_community_composition_nmds_compare.png', 'Resolution', 1200);
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\ifcb_community_composition_nmds_compare.pdf', 'Resolution', 1200, 'ContentType', 'vector');
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\ifcb_community_composition_nmds_compare.tiff', 'Resolution', 1200, 'ContentType', 'image');
+%% Panel B — June 2018
+%Events 
+
+%June 2018, April 2020
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 3, 1);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 7, 1);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+
+czu_date = datetime(2020, 8, 21);
+czu_date.TimeZone = 'UTC';
+
+august_date = datetime(2020, 9, 11);
+august_date.TimeZone = 'UTC';
+% shade_start = datetime(2020,6,1);
+% shade_start.TimeZone = 'UTC';
+% shade_end = datetime(2020,7,1);
+% shade_end.TimeZone = 'UTC';
+
+%By day
+start_date_day = day(start_date, 'dayofyear');
+end_date_day = day(end_date, 'dayofyear');
+lag_date_day = day(lag_date, 'dayofyear');
+czu_date_day=day(czu_date,'dayofyear');
+august_date_day = day(august_date, 'dayofyear');
+
+%By datenum
+start_date_datenum = datenum(start_date);
+end_date_datenum = datenum(end_date);
+czu_date_datenum=datenum(czu_date);
+lag_date_datenum = datenum(lag_date);
+august_date_datenum = datenum(august_date);
+
+%For shading
+shade_start_datenum = start_date_datenum;
+shade_end_datenum = end_date_datenum;
+
+
+
+%% IFCB Taxa abundance analysis 
+
+%Add paths
+addpath('Q:\Dante\Wildfire_Obs\functions\')
+addpath('Q:\Dante\Wildfire_Obs\')
+addpath('Q:\Dante\data\MB_Wildfire_Obs\processed_data\')
+
+%IFCB
+load('ifcb_ucsc_all_mean.mat')
+load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat')
+
+%Load wildfire data
+
+%PM 2.5
+load('Q:\Dante\data\MB_Wildfire_Obs\pm2_5\sc_pm2.5_daily_all.mat')
+
+%Subset to a site
+sc_pm2_5_daily=sc_pm2_5_daily(sc_pm2_5_daily.LocalSiteName=="San Lorenzo Valley Middle School",:);
+
+
+
+% Goal: Plot with taxa on y, time lag on the x and 
+
+% Extract the taxa columns and AOD_500nm column
+taxa_data = table2array(ifcbbray(:, [2:52,59]));
+aod_500nm =ifcbbray.AOD_500nm;
+
+% Initialize variables to store coefficients and lags
+cc = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));
+lags = zeros(size(taxa_data, 1)*2-1, size(taxa_data, 2));  % Corrected dimensions
+
+taxa = ifcbbray.Properties.VariableNames([2:52,59]);
+
+
+
+%%
+close all
+plotting = 1;
+
+sc_pm2_5_daily_join=sc_pm2_5_daily(:,["datetime","pm2_5"]);
+% Process data for the year 2020
+% sc_pm2_5_daily = sc_pm2_5_daily(sc_pm2_5_daily.datetime.Year == 2020, :);
+
+% Merge the sc_pm2_5_daily data with ifcbbray based on datetime
+ifcb_pm25 = outerjoin(ifcbbray, sc_pm2_5_daily_join, 'Keys', 'datetime', 'MergeKeys', true, 'Type', 'left');
+
+
+% Assuming ifcb_pm25 is already loaded into the workspace
+
+% Extract the taxa columns and AOD_500nm column
+ifcb_taxa_sel=ifcb_pm25(:, [2:52,59]);
+taxa_data = table2array(ifcb_taxa_sel);
+pm25 = ifcb_pm25.pm2_5;
+
+%% June 2018
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+start_date = datetime(2018, 5, 15);
+end_date = datetime(2018, 7, 15);
+start_date_lim=datetime(2018, 5, 1);
+end_date_lim = datetime(2018, 8, 1);
+
+shade_start = datetime(2018,6,1);
+shade_end = datetime(2018,6,30);
+ % --- Filter Taxa based on Significant Adjusted P-values and CC >= 0.6 --- %
+
+% Load the previous table with significant taxa
+previous_table = readtable('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\tables\all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa;
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+% Filter taxa with max CC >= 0.6 and keep only those
+valid_taxa = significant_taxa(contains(significant_taxa, '*'));  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Remove underscores ONLY for the legend labels
+legend_labels = strrep(new_variable_names(1:end-1), '_', ' ');
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+extended_color_map = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    % 0.3, 0.7, 0.3;  % Deep Green
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6;% Soft blue-green
+    0.7, 0.7, 0.7; 
+    0.7, 0.7, 0.7];   % Medium gray (for "Other Taxa")
+
+legend_labels = {
+    '\it{Asterionellopsis}'
+    'Centric Diatoms'
+    '\it{Chaetoceros}'
+    '\it{Nitzschia/Cylindrotheca}'
+    '\it{Detonula}, \it{Cerataulina}, \it{Lauderia}'
+    '\it{Entomoneis}'
+    '\it{Guinardia}/\it{Dactyliosolen}'
+    '\it{Hemiaulus}'
+    '\it{Leptocylindrus}'
+    'Pennate Diatoms'
+    '\it{Polykrikos}'
+    '\it{Pseudo\_nitzschia}'
+    '\it{Skeletonema}'
+    '\it{Thalassionema}'
+    '\it{Thalassiosira}'
+    'Other Taxa'
+};
+
+
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2018, 5, 15) datetime(2018, 7, 15)]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date:caldays(7):end_date);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+% legend(legend_labels, ...
+%        'Location', 'bestoutside', ...
+%        'FontSize', ftsz+3, ...
+%        'FontName', ftname, ...
+%        'Interpreter', 'tex', ...
+%        'Box', 'off','AutoUpdate','off');
+% legend('hide');
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.3]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+% xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+% fill([shade_start, shade_start, shade_end, shade_end], ...
+%      [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+%      [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);  % Adjust 'FaceAlpha' for transparency
+% xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Add panel label ' to top-left outside the axes
+text(ax.Position(1) - 0.12, ax.Position(2) + ax.Position(4) + 0.08, 'b', ...
+     'Units', 'normalized', 'FontWeight', 'bold', 'FontSize', ftsz + 6, ...
+     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 7, 4]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Add 'June 2018' near bottom middle
+% Get current limits and position
+yl = ylim;
+xl = xlim;
+
+text(mean(xl), yl(1) + 0.8 * range(yl), 'June 2018', ...
+     'Color', [0.57, 0.44, 0.86], 'FontSize', ftsz + 4, 'FontWeight', 'bold', ...
+     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+     'FontName', ftname);
+
+
+
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance2018.png', 'Resolution', 1200);
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance2018.pdf', 'Resolution', 1200, 'ContentType', 'vector');
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance2018.tiff', 'Resolution', 1200, 'ContentType', 'image');
+
+
+%% April 2020
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Dates
+lag_days = 6;
+start_date = datetime(2020, 4, 23);
+start_date.TimeZone = 'UTC';
+end_date = datetime(2020, 5, 8);
+end_date.TimeZone = 'UTC';
+lag_date = datetime(2020, 8, 21 + lag_days);
+lag_date.TimeZone = 'UTC';
+start_date_lim=datetime(2020, 4, 15);
+start_date_lim.TimeZone = 'UTC';
+end_date_lim = datetime(2020, 6, 1);
+end_date_lim.TimeZone = 'UTC';
+
+shade_start=start_date;
+shade_end=end_date;
+
+legend_labels = {
+    '\it{Asterionellopsis}'
+    'Centric Diatoms'
+    '\it{Chaetoceros}'
+    '\it{Nitzschia/Cylindrotheca}'
+    '\it{Detonula}, \it{Cerataulina}, \it{Lauderia}'
+    '\it{Entomoneis}'
+    '\it{Guinardia}/\it{Dactyliosolen}'
+    '\it{Hemiaulus}'
+    '\it{Leptocylindrus}'
+    'Pennate Diatoms'
+    '\it{Polykrikos}'
+    '\it{Pseudo\_nitzschia}'
+    '\it{Skeletonema}'
+    '\it{Thalassionema}'
+    '\it{Thalassiosira}'
+    'Other Taxa'
+};
+
+% Load the previous table with significant taxa
+previous_table = readtable('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\tables\all_taxa_with_p_values.csv');  % Assuming you have already saved the table
+
+% Extract the significant taxa names and their corresponding max CC values from the previous table
+significant_taxa = previous_table.Taxa;
+max_cc_values = previous_table.Max_CC;  % Extract the max cross-correlation coefficients
+
+% Filter taxa with max CC >= 0.6 and keep only those
+valid_taxa = significant_taxa(contains(significant_taxa, '*'));  % Taxa that meet both CC >= 0.6 and significant adjusted p-value
+
+% Remove '*' from taxa names (used for significance annotation) for matching with the dataset
+valid_taxa = strrep(valid_taxa, '*', '');
+
+% Set publication settings
+ftsz = 10;  % Font size for publication
+ftname = 'Helvetica';  % Font name
+linewdt = 1.5;  % Line width for xlines and plot elements
+
+
+% Select taxa (assuming ifcb_taxa_plot contains all taxa except "Other Taxa")
+ifcb_taxa_plot = ifcb_taxa_sel(:, 1:end-1);
+
+% Find indices of significant taxa based on the names in 'valid_taxa'
+significant_indices = find(ismember(ifcb_taxa_plot.Properties.VariableNames, valid_taxa));
+
+% Create a logical array to identify significant taxa
+is_significant = false(1, width(ifcb_taxa_plot));
+is_significant(significant_indices) = true;
+
+% Sum the abundances of non-significant taxa
+other_taxa_abundance = sum(table2array(ifcb_taxa_plot(:, ~is_significant)), 2);
+
+% Create a new table with significant taxa and 'Other Taxa' column
+new_taxa_abundances = [ifcb_taxa_plot(:, is_significant), array2table(other_taxa_abundance), table(ifcb_pm25.datetime)];  % Include datetime
+
+% Update variable names to include 'Other Taxa' and 'datetime'
+new_variable_names = [ifcb_taxa_plot.Properties.VariableNames(is_significant), 'Other Taxa', 'datetime'];
+new_taxa_abundances.Properties.VariableNames = new_variable_names;
+
+% Normalize taxa abundances to sum to 1 for each row
+taxa_abundances = varfun(@(x) x, new_taxa_abundances(:, 1:end-1));
+taxa_abundances.datetime = new_taxa_abundances.datetime;  % Add datetime for plotting
+taxa_abundances = retime(table2timetable(taxa_abundances, "RowTimes", 'datetime'), 'daily', 'fillwithmissing');
+taxa_abundances.datetime.TimeZone='UTC';
+% --- Colormap with Maximum Contrast --- %
+% Define manually specified colormap with maximum contrast
+extended_color_map = [
+    0.2, 0.6, 0.8;  % Light blue
+    0.9, 0.5, 0.1;  % Orange
+    0.8, 0.2, 0.2;  % Brighter Red
+    0.2, 0.8, 0.2;  % Brighter Green
+    0.2, 0.2, 0.8;  % Brighter Blue
+    1.0, 0.85, 0.0; % Bright Yellow
+    1.0, 0.6, 0.0;  % Bright Orange
+    0.4, 0.7, 0.2;  % Light green
+    0.8, 0.2, 0.4;  % Pink
+    0.6, 0.2, 0.9;  % Violet
+    0.1, 0.9, 0.9;  % Bright Cyan
+    1.0, 0.4, 0.1;  % Bright Coral
+    0.3, 0.7, 0.3;  % Deep Green
+    0.2, 0.4, 0.8;  % Dark blue
+    0.7, 0.2, 0.9;  % Purple
+    0.3, 0.7, 0.6   % Soft blue-green
+    0.7, 0.7, 0.7];   % Medium gray (for "Other Taxa")
+
+
+
+% Clear and set up the figure
+close all
+figure;
+
+% Plot using datetime directly, ensuring continuous data flow
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([start_date_lim end_date_lim]);  % Adjust as necessary
+
+% Apply custom color map with a distinct color for 'Other Taxa'
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+% Set x-axis with ticks every seven days
+set(gca, 'XTick', start_date_lim:caldays(7):end_date_lim);
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Labeling and title
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+
+% Add a custom legend using the new variable names (matching the correct order of taxa plotted)
+legend(legend_labels, ...
+       'Location', 'bestoutside', ...
+       'FontSize', ftsz+3, ...
+       'FontName', ftname, ...
+       'Interpreter', 'tex', ...
+       'Box', 'off','AutoUpdate','off');
+% legend('hide');
+% Optional: Adding a solid line bar at specific dates
+hold on;
+line_heights = [1, 1];
+
+% Adjust y-limits
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], "all") * 0.6]);
+
+% Add lines for 6 day lag and August Fire Smoke
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':'); 
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':'); 
+
+% Add shading for the fire window
+% xline(shade_start, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+% fill([shade_start, shade_start, shade_end, shade_end], ...
+%      [min(ylim) * 1.1, max(ylim) * 1.1, max(ylim) * 1.1, min(ylim) * 1.1], ...
+%      [0.6509 0.8078 0.8902], 'EdgeColor', 'none', 'FaceAlpha', 0.2);  % Adjust 'FaceAlpha' for transparency
+% xline(shade_end, 'Color', 'k', 'LineWidth', 1.5, 'LineStyle', '-');
+
+% Adjust axes properties for publication quality
+ax = gca;  % Get current axes
+ax.FontSize = ftsz;
+ax.FontName = ftname;
+
+% Adjust figure size for double-column width and aspect ratio (for L&O)
+set(gcf, 'Units', 'inches', 'Position', [0, 0, 8.5, 4.5]);  % 7.16 inches width and 4 inches height for good aspect ratio
+set(gcf, 'PaperPositionMode', 'auto');  % Ensure the figure fits the paper size
+
+% Get current limits and position
+yl = ylim;
+xl = xlim;
+
+% Add 'April 2020' near bottom middle
+text(mean(xl), yl(1) + 0.8 * range(yl), 'April 2020', ...
+     'Color', [0.39, 0.76, 0.65], 'FontSize', ftsz + 4, 'FontWeight', 'bold', ...
+     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+     'FontName', ftname);
+
+% Add panel label ' to top-left outside the axes
+text(ax.Position(1) - 0.12, ax.Position(2) + ax.Position(4) + 0.08, 'c', ...
+     'Units', 'normalized', 'FontWeight', 'bold', 'FontSize', ftsz + 6, ...
+     'HorizontalAlignment', 'left', 'VerticalAlignment', 'bottom');
+
+if saving==1
+    exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance_april2020.png', 'Resolution', 1200);
+    exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance_april2020.pdf', 'Resolution', 1200, 'ContentType', 'vector');
+    exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance_april2020.tiff',  'Resolution', 1200, 'ContentType', 'image');
+end 
+
+
+%% Combine Plots: Figure 6
+close all
+% Set figure properties
+ftsz = 8;
+ftname = 'Helvetica';
+linewdt = 1.5;
+ptsz = 25;
+tiledfigure = figure('Units', 'inches', 'Position', [0, 0, 5, 5]);
+t = tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+
+
+
+legend_labels = {
+    '\it{Asterionellopsis}'
+    'Centric'
+    '\it{Chaetoceros}'
+    '{Cyl Nitz}'
+    '{Det}, {Cer}, {Lau}'
+    '\it{Entomoneis}'
+    '{Guin } {Dact}'
+    '\it{Hemiaulus}'
+    '\it{Leptocylindrus}'
+    'Pennate'
+    '\it{Polykrikos}'
+    '\it{Pseudo nitzschia}'
+    '\it{Skeletonema}'
+    '\it{Thalassionema}'
+    '\it{Thalassiosira}'
+    'Other Taxa'
+};
+
+% Panel A: NMDS full width
+nexttile([1 2])
+
+% Cluster colors and base plot
+colors_cluster = colors_cluster(1:optimal_clusters, :);
+scatter_handles_clusters = gscatter(nmds_coords(:, 1), nmds_coords(:, 2), cluster_labels, colors_cluster, '.', ptsz-10);
+hold on;
+
+% Identify proximal points
+outside_buffer_indices = setdiff(all_indices, buffer_indices);
+proximal_indices = [];
+for i = 1:length(outside_buffer_indices)
+    distances_to_labeled = pdist2(nmds_coords(outside_buffer_indices(i), :), nmds_coords(labeled_indices, :));
+    if min(distances_to_labeled) < proximity_threshold
+        proximal_indices = [proximal_indices, outside_buffer_indices(i)];
+    end
+end
+
+% Extract month-year labels
+month_year_labels = cellstr(datestr(filtered_datetime_values, 'mmm-yyyy'));
+scatter_handles_criteria = [];
+legend_labels_clusters = arrayfun(@(k) ['Cluster ', num2str(k)], 1:optimal_clusters, 'UniformOutput', false);
+legend_labels_criteria = {};
+used_month_years = {};
+valid_month_years = {};
+
+% Identify valid month-years
+for i = 1:length(filtered_datetime_values) - 6
+    date_window = filtered_datetime_values(i:i + 6);
+    cluster_window = cluster_labels(i:i + 6);
+    if max(diff(date_window)) > days(7)
+        continue;
+    end
+    most_common_cluster = mode(cluster_window);
+    count_in_cluster = sum(cluster_window == most_common_cluster);
+    if count_in_cluster >= 4
+        cluster_indices_in_window = find(cluster_window == most_common_cluster);
+        date_indices_in_cluster = i + cluster_indices_in_window - 1;
+        distances = pdist2(nmds_coords(date_indices_in_cluster, :), nmds_coords(labeled_indices, :));
+        if sum(min(distances, [], 2) < proximity_threshold) >= 4
+            label = month_year_labels{date_indices_in_cluster(1)};
+            if ~ismember(label, valid_month_years)
+                valid_month_years{end+1} = label;
+            end
+        end
+    end
+end
+
+% Plot criteria points
+for i = 1:length(filtered_datetime_values) - 6
+    date_window = filtered_datetime_values(i:i + 6);
+    cluster_window = cluster_labels(i:i + 6);
+    if max(diff(date_window)) > days(7)
+        continue;
+    end
+    most_common_cluster = mode(cluster_window);
+    count_in_cluster = sum(cluster_window == most_common_cluster);
+    if count_in_cluster >= 4
+        cluster_indices_in_window = find(cluster_window == most_common_cluster);
+        date_indices_in_cluster = i + cluster_indices_in_window - 1;
+        distances = pdist2(nmds_coords(date_indices_in_cluster, :), nmds_coords(labeled_indices, :));
+        if sum(min(distances, [], 2) < proximity_threshold) >= 4
+            label = month_year_labels{date_indices_in_cluster(1)};
+            color_idx = find(strcmp(valid_month_years, label));
+            if isempty(color_idx) || color_idx > size(colors_month_year, 1)
+                continue;
+            end
+            color = colors_month_year(color_idx, :);
+            if ~ismember(label, used_month_years)
+                scatter_handle = scatter(nmds_coords(date_indices_in_cluster(1), 1), nmds_coords(date_indices_in_cluster(1), 2), ...
+                    ptsz+10, color, 'filled', 'diamond');
+                scatter_handles_criteria = [scatter_handles_criteria; scatter_handle];
+                legend_labels_criteria{end+1} = label;
+                used_month_years{end+1} = label;
+            end
+            for j = 2:length(date_indices_in_cluster)
+                idx = date_indices_in_cluster(j);
+                scatter(nmds_coords(idx, 1), nmds_coords(idx, 2), ptsz, color, 'filled', 'diamond');
+            end
+        end
+    end
+end
+
+% Combine legends
+if isrow(scatter_handles_clusters)
+    scatter_handles_clusters = scatter_handles_clusters';
+end
+legend([scatter_handles_clusters; scatter_handles_criteria], [legend_labels_clusters, legend_labels_criteria], ...
+       'Location', 'bestoutside', 'FontSize', ftsz, 'FontName', ftname);
+
+xlabel('NMDS 1', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+ylabel('NMDS 2', 'FontWeight', 'bold', 'FontSize', ftsz, 'FontName', ftname);
+title('a', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [0.03 1.03], 'HorizontalAlignment', 'left');
+
+% Panel B: June 2018
+nexttile
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2018,5,15,'TimeZone','UTC'), datetime(2018,7,15,'TimeZone','UTC')]);
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], 'all') * 0.3]);
+xticks(datetime(2018,5,15,'TimeZone','UTC'):days(7):datetime(2018,7,15,'TimeZone','UTC'));
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+title('b', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [0.0 1.03], 'HorizontalAlignment', 'left');
+
+% Set x-axis with ticks every seven days
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+% Add annotation for June 2018
+
+% Get current limits and position
+yl = ylim;
+xl = xlim;
+text(mean(xl), yl(1) + 0.8 * range(yl), ["June"+newline+"2018"], ...
+     'Color', [0.57, 0.44, 0.86], 'FontSize', ftsz + 2, 'FontWeight', 'bold', ...
+     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+     'FontName', ftname);
+
+
+
+% Panel C: April 2020
+nexttile
+hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+xlim([datetime(2020,4,15,'TimeZone','UTC'), datetime(2020,6,1,'TimeZone','UTC')]);
+ylim([0 max(table2array(taxa_abundances(:, 1:end)), [], 'all') * 0.6]);
+xticks(datetime(2020,4,15,'TimeZone','UTC'):days(7):datetime(2020,6,1,'TimeZone','UTC'));
+xline(czu_date, 'Color', 'k', 'LineWidth', linewdt, 'LineStyle', ':');
+xline(lag_date, 'Color', '#cf572b', 'LineWidth', linewdt, 'LineStyle', ':');
+for k = 1:length(hBar)
+    hBar(k).FaceColor = 'flat';
+    hBar(k).CData = repmat(extended_color_map(k, :), size(taxa_abundances, 1), 1);
+end
+ylabel('cells L^{-1}', 'FontSize', ftsz, 'FontName', ftname);
+title('c', 'FontWeight', 'bold', 'FontSize', ftsz + 10, 'Units', 'normalized', 'Position', [-0.05 1.03], 'HorizontalAlignment', 'left');
+
+% Set x-axis with ticks every seven days
+ax = gca;
+ax.XTickLabelRotation = 45;  % Rotate labels for readability
+
+
+% Add annotation for April 2020
+% Get current limits and position
+yl = ylim;
+xl = xlim;
+text(mean(xl), yl(1) + 0.8 * range(yl), ["April"+newline+"2020"], ...
+     'Color', [0.39, 0.66, 0.65], 'FontSize', ftsz + 2, 'FontWeight', 'bold', ...
+     'HorizontalAlignment', 'center', 'VerticalAlignment', 'bottom', ...
+     'FontName', ftname);
+
+
+% Get position of Panel C axes
+ax_pos = ax.Position;
+
+% Create the legend
+lgd = legend(legend_labels, ...
+    'Location', 'northeastoutside', ...
+    'FontSize', ftsz, ...
+    'FontName', ftname, ...
+    'Interpreter', 'tex');
+
+% Adjust legend position to align vertically with Panel C
+lgd.Position(2) = ax_pos(2);         % Align bottom
+lgd.Position(4) = ax_pos(4);         % Match height
+
+% Align left of legend slightly offset from the right edge of Panel C
+offset = 0.02;  % horizontal spacing
+lgd.Position(1) = ax_pos(1) + ax_pos(3) + offset;
+% Adjust legend position manually
+lgd.Position(2) = ax_pos(2);           % Align bottom
+lgd.Position(4) = ax_pos(4);           % Match height of Panel C
+lgd.Position(1) = ax_pos(1) + ax_pos(3) + offset;  % Slightly to the right of Panel C
+
+% Adjust legend box position to avoid cutoff
+lgd.Position(3) = lgd.Position(3) - 0.05;  % increase width slightly to avoid right cutoff
+
+% Adjust legend width for right padding
+right_padding = 0.02;  % extra width to avoid clipping
+
+lgd.Position(3) = lgd.Position(3) + right_padding;
+% Optional: shift left slightly so expansion goes both ways
+lgd.Position(1) = lgd.Position(1) - right_padding / 2;
+
+
+lgd.ItemTokenSize = [8, 10];  % [width, height] in points
+
+
+% Apply consistent font styling
+allAxes = findall(tiledfigure, 'Type', 'axes');
+for i = 1:length(allAxes)
+    allAxes(i).FontSize = ftsz;
+    allAxes(i).FontName = ftname;
+end
+
+lgd.ItemTokenSize = [8, 10];  % [width, height] in points
+
+set(gcf, 'PaperPositionMode', 'auto');
+
+saving=1;
+if saving==1
+    % % ---- Save as TIFF (1200 DPI) ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.tiff', 'Resolution', 1200);
+    % 
+    % % ---- Save as PDF using exportgraphics ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.pdf', ...
+    %     'ContentType', 'image', 'Resolution', 1200);
+    % 
+    % % ---- Save as PNG using exportgraphics ----
+    % exportgraphics(gcf, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.png', ...
+    %     'Resolution', 1200);
+    print(gcf, '-dpng', '-r1200',  'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.png');
+    print(gcf, '-dpdf', '-r1200',  'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_6_v0.pdf');
+end
+
+
+%%
+% ----- Stitch All 3 Panels Vertically -----
+img_a = imread('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\ifcb_community_composition_nmds_compare.tiff');
+img_b = imread('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance2018.tiff');
+img_c = imread('C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\taxa_abundance_april2020.tiff');
+
+
+% STEP 1: Set final figure dimensions (in pixels @ 1200 DPI for 5 inches wide)
+dpi = 1200;
+target_width = 5 * dpi;     % 6000 px
+target_height = 6 * dpi;    % 7200 px
+
+% STEP 2: Set row heights
+top_row_height = round(2/6 * target_height);      % 2 inches worth
+bottom_row_height = target_height - top_row_height;
+
+% STEP 3: Resize bottom panels (same height, half width each)
+img_b = imresize(img_b, [bottom_row_height NaN]);
+img_c = imresize(img_c, [bottom_row_height NaN]);
+
+% Match widths of B and C
+half_width = floor(target_width / 2);
+img_b = imresize(img_b, [bottom_row_height half_width]);
+img_c = imresize(img_c, [bottom_row_height half_width]);
+
+% Combine bottom row
+bottom_row = cat(2, img_b, img_c);
+
+% Resize top panel to match total width and top height
+img_a = imresize(img_a, [top_row_height target_width]);
+
+% Combine top and bottom
+stitched_img = cat(1, img_a, bottom_row);
+
+% Optional: Add small padding
+stitched_img = padarray(stitched_img, [60 40], 255, 'both');
+
+% Show
+figure('Units', 'inches', 'Position', [0 0 5 6]);
+imshow(stitched_img);
+
+
+
+
+
+%% 
+
+%
+
+% ---- Save as PNG (1200 DPI) ----
+% imwrite(stitched_img, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7_v0.png', 'Resolution', 1200);
+
+
+% ---- Save as TIFF (1200 DPI) ----
+imwrite(stitched_img, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.tiff', 'Resolution', 1200);
+
+% ---- Save as PDF using exportgraphics ----
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.pdf', ...
+    'ContentType', 'image', 'Resolution', 1200);
+
+% ---- Save as PNG using exportgraphics ----
+exportgraphics(gca, 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\figure_7_v0.png', ...
+    'ContentType', 'image', 'Resolution', 1200);
+
+
+%% Step 12: Save the figure if needed (L&O style)
+saving = 1;
+if saving == 1
+    print(gcf, '-dpng', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\community_composition\ifcb_community_composition_nmds_compare.png');
+    print(gcf, '-dpdf', '-r1200', 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\community_composition\ifcb_community_composition_nmds_compare.pdf');
+end
+
+
+%% Now visualize comparable events
+
+% Define your specific dates
+start_date = datetime(2020, 8, 25);    % Event start date
+end_date = datetime(2020, 8, 27);      % Event end date
+shade_start = datetime(2020, 7, 25);   % Shade start for context period (30 days prior)
+shade_end = datetime(2020, 9, 27);     % Shade end for context period (30 days after)
+event_label = 'August 2020 Event';     % Label for the event
+
+% Run the function with these parameters
+generate_event_plots(start_date, end_date, shade_start, shade_end, event_label);
+
+
+function generate_event_plots(start_date, end_date, shade_start, shade_end, event_label)
+    % Set publication settings
+    ftsz = 10;
+    ftname = 'Helvetica';
+    linewdt = 1.5;
+
+    % Convert dates for easy display and saving
+    month_year = datestr(start_date, 'mmm_yyyy');
+
+    % Load necessary data
+    load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\joined_physical_drivers\physical_forcings_biology_table_alltime.mat');
+    load('Q:\Dante\data\MB_Wildfire_Obs\processed_data\ifcb_processed\ifcb_bray.mat');  % Load the community data for NMDS
+    
+    % Define colors, variable groups, and file paths
+    color_table = define_color_table();
+    output_dir = 'C:\Users\Dante Capone\OneDrive\Desktop\Scripps_PhD\Wildfire_Obs\MB_Wildfire_Obs\figures\final\figure_7\';
+    
+    % Generate NMDS plots based on proximity threshold within selected clusters
+    plot_nmds_events(ifcbbray, start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt);
+
+    % Plot 1: Taxa Abundance
+    previous_table = readtable('all_taxa_with_p_values.csv');
+    significant_taxa = previous_table.Taxa;
+    max_cc_values = previous_table.Max_CC;
+    valid_taxa = strrep(significant_taxa, '*', '');  % Clean taxa names
+    plot_taxa_abundance(ifcbbray, valid_taxa, start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt);
+
+    % Plot 2: Group 1 Physical Drivers (Time Series and Anomalies)
+    group1_vars = {'pm2_5_sc_pm2_5_daily_slv_tt', 'temperature', 'wspd_along', ...
+                   'surface_downwelling_photosynthetic_photon_flux_in_air', 'Silicate'};
+    group1_titles = {'PM2.5 SLV', 'Temperature', 'Wind Speed', 'Surface PAR', 'Silicate'};
+    group1_ylabels = {'PM2.5 [μg/m³]', 'Temperature [°C]', 'Wind Speed [m/s]', 'PAR [μmol photons m⁻² s⁻¹]', 'Silicate [μmol/L]'};
+    plot_physical_drivers(physical_forcings_biology_table, group1_vars, group1_titles, group1_ylabels, ...
+                          start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt, 'group1');
+
+    % Plot 3: Group 2 Physical Drivers (Time Series and Anomalies)
+    group2_vars = {'Nitrate', 'Phosphate', 'Ammonium', 'BEUTI', 'outflow'};
+    group2_titles = {'Nitrate', 'Phosphate', 'Ammonium', 'BEUTI', 'Outflow'};
+    group2_ylabels = {'Nitrate [μmol/L]', 'Phosphate [μmol/L]', 'Ammonium [μmol/L]', 'BEUTI', 'Outflow [m³/s]'};
+    plot_physical_drivers(physical_forcings_biology_table, group2_vars, group2_titles, group2_ylabels, ...
+                          start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt, 'group2');
+end
+
+function plot_nmds_events(ifcb_data, start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt)
+    % Filter data within the date range
+    datetime_values = ifcb_data.datetime;
+    taxa_counts = ifcb_data{:, 2:52};  % Community composition data
+
+    % Step 1: Filter dates within range for clustering analysis
+    date_range_indices = find(datetime_values >= start_date & datetime_values <= end_date);
+    cluster_of_interest = mode(cluster_labels(date_range_indices)); % Get cluster with majority of points in date range
+
+    % Step 2: Extract and process data for NMDS only within the chosen cluster
+    cluster_indices = find(cluster_labels == cluster_of_interest);
+    cluster_coords = nmds_coords(cluster_indices, :);
+    cluster_dates = datetime_values(cluster_indices);
+    
+    % Calculate pairwise distances within this cluster
+    if size(cluster_coords, 1) > 1
+        cluster_distances = pdist(cluster_coords);
+        proximity_threshold = prctile(cluster_distances, 10);
+    else
+        proximity_threshold = NaN;
+    end
+
+    % Generate NMDS plot with color coding for clusters and event dates
+    figure;
+    gscatter(cluster_coords(:,1), cluster_coords(:,2), cluster_dates, 'rgbcmyk', '.', 12);
+    hold on;
+    xlabel('NMDS 1', 'FontSize', ftsz, 'FontName', ftname);
+    ylabel('NMDS 2', 'FontSize', ftsz, 'FontName', ftname);
+    title(['NMDS of Community Structure (' month_year ')'], 'FontSize', ftsz, 'FontName', ftname);
+    
+    % Highlight the shaded period
+    yline(proximity_threshold, '--r', 'Proximity Threshold', 'FontSize', ftsz, 'FontName', ftname);
+    
+    % Save figure
+    saveas(gcf, fullfile(output_dir, ['NMDS_event_' month_year '.png']));
+end
+
+function color_table = define_color_table()
+    % Define variable colors
+    variables = {'temperature', 'BEUTI', 'wspd_along', 'outflow', ...
+                 'surface_downwelling_photosynthetic_photon_flux_in_air', 'Nitrate', ...
+                 'Phosphate', 'Silicate', 'Ammonium', 'pm2_5_sc_pm2_5_daily_slv_tt'};
+    high_colors = {'#de4e6a', '#347a0d', '#eba42a', '#1e0db8', ...
+                   '#bc5090', '#f0c76e', '#ede32b', '#0ad125', '#ffb6c1', '#d62728'};
+    low_colors = {'#5698e8', '#b9e3a1', '#71d3de', '#c1bbfc', ...
+                  '#ffa600', '#5bd4c8', '#afdef0', '#c7c5c1', '#4682b4', '#2ca02c'};
+    color_table = table(variables', high_colors', low_colors', 'VariableNames', {'Variable', 'HighColor', 'LowColor'});
+end
+
+function plot_taxa_abundance(ifcb_taxa_sel, valid_taxa, start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt)
+    % Placeholder for taxa abundance plotting (bar plot and colormap application)
+    figure;
+    hBar = bar(taxa_abundances.datetime, table2array(taxa_abundances(:, 1:end)), 'stacked', 'BarWidth', 1);
+    title(['Taxa Abundance (' month_year ')'], 'FontSize', ftsz, 'FontName', ftname);
+    xlabel('Taxa', 'FontSize', ftsz, 'FontName', ftname);
+    ylabel('Abundance', 'FontSize', ftsz, 'FontName', ftname);
+    saveas(gcf, fullfile(output_dir, ['Taxa_Abundance_' month_year '.png']));
+end
+
+function plot_physical_drivers(physical_data, vars, titles, ylabels, start_date, end_date, shade_start, shade_end, month_year, output_dir, ftsz, ftname, linewdt, group_label)
+    % Placeholder for physical drivers plotting (time series and anomalies)
+    figure;
+    num_vars = length(vars);
+    for i = 1:num_vars
+        subplot(num_vars, 1, i);
+        plot(physical_data.(vars{i}));
+        title(titles{i}, 'FontSize', ftsz, 'FontName', ftname);
+        ylabel(ylabels{i}, 'FontSize', ftsz, 'FontName', ftname);
+        xline(shade_start, 'k--'); xline(shade_end, 'k--');
+    end
+    saveas(gcf, fullfile(output_dir, ['Physical_Drivers_' group_label '_' month_year '.png']));
+end
+
+
+
